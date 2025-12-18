@@ -16,4 +16,16 @@ export class OrganizationsService {
       },
     });
   }
+
+  async findAll() {
+    return this.prisma.organization.findMany({
+      select: {
+        id: true,
+        name: true,
+        domain: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
 }

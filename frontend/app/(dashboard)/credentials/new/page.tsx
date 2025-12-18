@@ -17,6 +17,8 @@ export default function NewCredentialPage() {
     apiKey: '',
     notes: '',
     tags: '',
+    isPaid: false,
+    hasAutopay: false,
   });
   const [showTemplates, setShowTemplates] = useState(false);
 
@@ -85,6 +87,8 @@ export default function NewCredentialPage() {
         apiKey: formData.apiKey || undefined,
         notes: formData.notes || undefined,
         tags: tagsArray,
+        isPaid: formData.isPaid,
+        hasAutopay: formData.hasAutopay,
       });
 
       toast.success('Credential created successfully');
@@ -228,6 +232,33 @@ export default function NewCredentialPage() {
               className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
               placeholder="Add any additional notes or context"
             />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="flex items-center">
+              <input
+                id="isPaid"
+                type="checkbox"
+                checked={formData.isPaid}
+                onChange={(e) => setFormData({ ...formData, isPaid: e.target.checked })}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+              />
+              <label htmlFor="isPaid" className="ml-2 block text-sm text-gray-700">
+                Paid Tool
+              </label>
+            </div>
+            <div className="flex items-center">
+              <input
+                id="hasAutopay"
+                type="checkbox"
+                checked={formData.hasAutopay}
+                onChange={(e) => setFormData({ ...formData, hasAutopay: e.target.checked })}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+              />
+              <label htmlFor="hasAutopay" className="ml-2 block text-sm text-gray-700">
+                Autopay Enabled
+              </label>
+            </div>
           </div>
 
           <div className="flex items-center justify-end gap-4 pt-4">

@@ -15,6 +15,7 @@ import {
   Sparkles,
   X,
   UserCog,
+  Building2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -41,6 +42,7 @@ export default function Sidebar({ isMobileOpen = false, onMobileClose }: Sidebar
     menuItems.push({ icon: UserCog, label: 'Teams', href: '/teams' });
   }
   if (role === 'ADMIN') {
+    menuItems.push({ icon: Building2, label: 'Organizations', href: '/organizations' });
     menuItems.push({ icon: FileSearch, label: 'Audit Logs', href: '/audit' });
   }
 

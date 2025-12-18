@@ -137,6 +137,8 @@ model Credential {
   apiKey         String? // Encrypted
   notes          String? // Encrypted
   tags           String[] // Array of tags
+  isPaid         Boolean  @default(false) // Free or Paid tool
+  hasAutopay     Boolean  @default(false) // Autopay enabled or not
   organizationId String
   ownerId        String
   createdAt      DateTime @default(now())

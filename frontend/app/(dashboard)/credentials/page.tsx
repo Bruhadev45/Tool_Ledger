@@ -56,6 +56,16 @@ export default function CredentialsPage() {
             aVal = `${a.owner?.firstName || ''} ${a.owner?.lastName || ''}`.toLowerCase();
             bVal = `${b.owner?.firstName || ''} ${b.owner?.lastName || ''}`.toLowerCase();
             break;
+          case 'isPaid':
+            // Sort by paid status: paid tools first (true), then free tools (false)
+            aVal = a.isPaid ? 1 : 0;
+            bVal = b.isPaid ? 1 : 0;
+            break;
+          case 'hasAutopay':
+            // Sort by autopay status: autopay enabled first (true), then disabled (false)
+            aVal = a.hasAutopay ? 1 : 0;
+            bVal = b.hasAutopay ? 1 : 0;
+            break;
           default:
             aVal = new Date(a.createdAt).getTime();
             bVal = new Date(b.createdAt).getTime();
@@ -171,6 +181,8 @@ export default function CredentialsPage() {
                 <option value="createdAt">Date</option>
                 <option value="name">Name</option>
                 <option value="owner">Owner</option>
+                <option value="isPaid">Free/Paid</option>
+                <option value="hasAutopay">Autopay</option>
               </select>
               <button
                 onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
@@ -243,18 +255,36 @@ export default function CredentialsPage() {
                   )}
                 </div>
               </div>
-              {cred.tags && cred.tags.length > 0 && (
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {cred.tags.map((tag: string) => (
-                    <span
-                      key={tag}
-                      className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
-                    >
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-              )}
+              <div className="mt-4 flex flex-wrap gap-2 items-center">
+                {cred.isPaid !== undefined && (
+                  <span
+                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                      cred.isPaid
+                        ? 'bg-yellow-100 text-yellow-800'
+                        : 'bg-green-100 text-green-800'
+                    }`}
+                  >
+                    {cred.isPaid ? 'Paid' : 'Free'}
+                  </span>
+                )}
+                {cred.hasAutopay && (
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                    Autopay
+                  </span>
+                )}
+                {cred.tags && cred.tags.length > 0 && (
+                  <>
+                    {cred.tags.map((tag: string) => (
+                      <span
+                        key={tag}
+                        className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </>
+                )}
+              </div>
               <div className="mt-4 flex items-center justify-between">
                 <Link
                   href={`/credentials/${cred.id}`}

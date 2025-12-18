@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsArray } from 'class-validator';
+import { IsString, IsOptional, IsArray, IsBoolean } from 'class-validator';
 
 export class CreateCredentialDto {
   @IsString()
@@ -22,4 +22,12 @@ export class CreateCredentialDto {
   @IsArray()
   @IsString({ each: true })
   tags?: string[];
+
+  @IsOptional()
+  @IsBoolean()
+  isPaid?: boolean; // Free or Paid tool
+
+  @IsOptional()
+  @IsBoolean()
+  hasAutopay?: boolean; // Autopay enabled or not
 }

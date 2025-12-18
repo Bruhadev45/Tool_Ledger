@@ -174,34 +174,37 @@ export class InvoicesParserService {
 
   private extractInvoiceNumber(text: string): string | undefined {
     // Common patterns: INV-2024-001, Invoice #12345, Invoice Number: INV-001, etc.
+    // Improved patterns with better accuracy
     const patterns = [
-      // Invoice Number: INV-2024-001 or Invoice #: INV-2024-001
-      /invoice\s*(?:number|#|no\.?|num\.?)?\s*:?\s*([A-Z0-9\-_\/]+)/i,
+      // Invoice Number: INV-2024-001 or Invoice #: INV-2024-001 (highest priority)
+      /invoice\s*(?:number|#|no\.?|num\.?|id)\s*:?\s*([A-Z0-9\-_\/]+)/i,
       // INV-2024-001 or INV 2024 001
       /(?:invoice|inv)\.?\s*([A-Z0-9\-_\/]+)/i,
       // # INV-2024-001 or #12345
       /#\s*([A-Z0-9\-_\/]+)/i,
-      // INV-2024-001, INV-001, INV2024001
-      /(INV[-\s_]?\d{4}[-\s_]?\d+)/i,
+      // INV-2024-001, INV-001, INV2024001 (improved pattern)
+      /\b(INV[-\s_]?\d{4}[-\s_]?\d{2,})\b/i,
       // 2024-INV-001 or 2024/INV/001
-      /(\d{4}[-\s_\/]?[A-Z]{2,4}[-\s_\/]?\d+)/i,
+      /\b(\d{4}[-\s_\/]?[A-Z]{2,4}[-\s_\/]?\d{2,})\b/i,
       // Invoice ID: ABC123 or Invoice ID ABC123
       /invoice\s*id\s*:?\s*([A-Z0-9\-_\/]+)/i,
       // Bill Number: BILL-001
-      /bill\s*(?:number|#|no\.?)?\s*:?\s*([A-Z0-9\-_\/]+)/i,
+      /bill\s*(?:number|#|no\.?|id)?\s*:?\s*([A-Z0-9\-_\/]+)/i,
       // Reference: REF-2024-001
       /reference\s*(?:number|#|no\.?)?\s*:?\s*([A-Z0-9\-_\/]+)/i,
       // Document Number: DOC-001
       /document\s*(?:number|#|no\.?)?\s*:?\s*([A-Z0-9\-_\/]+)/i,
+      // Order Number: ORD-001
+      /order\s*(?:number|#|no\.?)?\s*:?\s*([A-Z0-9\-_\/]+)/i,
       // Standalone patterns like INV-001, INV001, #001
       /\b(INV[-\s_]?\d{3,})\b/i,
-      // Alphanumeric codes like ABC123, 123ABC, etc.
+      // Alphanumeric codes like ABC123, 123ABC, etc. (but not dates)
       /\b([A-Z]{2,}\d{2,}|\d{2,}[A-Z]{2,})\b/,
-      // Any sequence of alphanumeric with dashes/underscores (but not dates)
-      /\b([A-Z0-9][A-Z0-9\-_\/]{3,})\b/i,
     ];
 
-    // Try each pattern and return the first match
+    const candidates: Array<{ value: string; confidence: number }> = [];
+
+    // Try each pattern and collect candidates with confidence scores
     for (const pattern of patterns) {
       const matches = text.matchAll(new RegExp(pattern.source, pattern.flags + 'g'));
       for (const match of matches) {
@@ -214,15 +217,31 @@ export class InvoicesParserService {
             !/^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}$/.test(candidate) && // Not a date
             !/^\$?[\d,]+\.?\d*$/.test(candidate) && // Not an amount
             !/^\d{4}-\d{2}-\d{2}$/.test(candidate) && // Not ISO date
-            !/^[A-Z]{3}$/.test(candidate) // Not a currency code
+            !/^[A-Z]{3}$/.test(candidate) && // Not a currency code
+            !/^\d+$/.test(candidate) || candidate.length > 6 // Not just numbers (unless long)
           ) {
-            this.logger.debug(
-              `Extracted invoice number: ${candidate} using pattern: ${pattern.source}`,
-            );
-            return candidate;
+            // Calculate confidence based on pattern type
+            let confidence = 5;
+            if (pattern.source.includes('invoice.*number|invoice.*#')) {
+              confidence = 10; // Highest confidence
+            } else if (pattern.source.includes('INV')) {
+              confidence = 9; // High confidence for INV patterns
+            } else if (pattern.source.includes('bill|reference|document|order')) {
+              confidence = 8; // Good confidence for labeled fields
+            }
+
+            candidates.push({ value: candidate, confidence });
           }
         }
       }
+    }
+
+    // Return the candidate with highest confidence
+    if (candidates.length > 0) {
+      candidates.sort((a, b) => b.confidence - a.confidence);
+      const best = candidates[0];
+      this.logger.debug(`Extracted invoice number: ${best.value} with confidence: ${best.confidence}`);
+      return best.value;
     }
 
     // Fallback: Look for common invoice number formats in filename
@@ -249,22 +268,26 @@ export class InvoicesParserService {
 
   private extractAmount(text: string): number | undefined {
     // Look for currency amounts: $1,234.56, USD 1,234.56, ₹1,234.56, INR 1,234.56, Total: $1,234.56, etc.
+    // Improved patterns with better accuracy
     const patterns = [
-      // Total/Amount/Balance/Due with currency symbols
-      /(?:total|amount|subtotal|balance|due|grand\s*total)\s*(?:amount)?\s*:?\s*[₹$€£]?\s*([\d,]+\.?\d*)/i,
-      // Currency symbols: $, ₹, €, £
-      /[₹$€£]\s*([\d,]+\.?\d*)/,
-      // Currency codes: USD, INR, EUR, GBP, CAD, etc.
-      /(?:USD|INR|EUR|GBP|CAD|AUD|JPY|CNY)\s*([\d,]+\.?\d*)/i,
+      // Total/Amount/Balance/Due with currency symbols (highest priority)
+      /(?:total|amount|subtotal|balance|due|grand\s*total|invoice\s*amount|payable|charges)\s*(?:amount)?\s*:?\s*[₹$€£]?\s*([\d,]+\.?\d{2}?)/i,
+      // Currency symbols: $, ₹, €, £ (with decimal places)
+      /[₹$€£]\s*([\d,]+\.?\d{2}?)/,
+      // Currency codes: USD, INR, EUR, GBP, CAD, etc. (with decimal places)
+      /(?:USD|INR|EUR|GBP|CAD|AUD|JPY|CNY)\s*([\d,]+\.?\d{2}?)/i,
       // Indian Rupee formats: Rs. 1,234.56, Rs 1,234.56, ₹1,234.56
-      /Rs\.?\s*([\d,]+\.?\d*)/i,
-      // Decimal amounts with 2 decimal places
-      /([\d,]+\.\d{2})\b/,
-      // Any number that looks like an amount (with commas)
+      /Rs\.?\s*([\d,]+\.?\d{2}?)/i,
+      // Amount with "USD" or currency code after number
+      /([\d,]+\.?\d{2}?)\s*(?:USD|INR|EUR|GBP)/i,
+      // Decimal amounts with 2 decimal places (common invoice format)
+      /([\d]{1,3}(?:,\d{3})*\.\d{2})\b/,
+      // Any number that looks like an amount (with commas and decimals)
       /([\d]{1,3}(?:,\d{3})*(?:\.\d{2})?)\b/,
     ];
 
     let bestMatch: { amount: number; confidence: number } | null = null;
+    const seenAmounts = new Set<number>();
 
     for (const pattern of patterns) {
       const matches = text.matchAll(new RegExp(pattern.source, pattern.flags + 'g'));
@@ -273,16 +296,25 @@ export class InvoicesParserService {
           const amountStr = match[1].replace(/,/g, '').trim();
           const amount = parseFloat(amountStr);
 
-          if (!isNaN(amount) && amount > 0 && amount < 1000000000) {
-            // Reasonable upper limit
+          if (!isNaN(amount) && amount > 0 && amount < 1000000000 && !seenAmounts.has(amount)) {
+            seenAmounts.add(amount);
+            
             // Higher confidence for amounts with currency indicators
-            const confidence = pattern.source.includes('total|amount|balance')
-              ? 10
-              : pattern.source.includes('[₹$€£]')
-                ? 9
-                : pattern.source.includes('USD|INR|EUR')
-                  ? 8
-                  : 5;
+            let confidence = 5;
+            if (pattern.source.includes('total|amount|balance|due|payable')) {
+              confidence = 10; // Highest confidence for labeled amounts
+            } else if (pattern.source.includes('[₹$€£]')) {
+              confidence = 9; // High confidence for currency symbols
+            } else if (pattern.source.includes('USD|INR|EUR')) {
+              confidence = 8; // Good confidence for currency codes
+            } else if (pattern.source.includes('\\.\\d{2}')) {
+              confidence = 7; // Good confidence for decimal amounts
+            }
+
+            // Prefer larger amounts (likely to be totals, not line items)
+            if (amount > 10 && amount < 100000) {
+              confidence += 1;
+            }
 
             if (!bestMatch || confidence > bestMatch.confidence) {
               bestMatch = { amount, confidence };
@@ -299,6 +331,7 @@ export class InvoicesParserService {
       return bestMatch.amount;
     }
 
+    this.logger.warn('Could not extract amount from invoice text');
     return undefined;
   }
 
@@ -313,7 +346,7 @@ export class InvoicesParserService {
   }
 
   private extractProvider(text: string, filename: string): string | undefined {
-    // Common provider names
+    // Common provider names (expanded list)
     const providers = [
       'AWS',
       'Amazon Web Services',
@@ -350,38 +383,69 @@ export class InvoicesParserService {
       'HubSpot',
       'Zendesk',
       'Intercom',
+      'Vercel',
+      'Netlify',
+      'Heroku',
+      'DigitalOcean',
+      'Linode',
+      'Cloudflare',
+      'Fastly',
+      'Akamai',
+      'Datadog',
+      'New Relic',
+      'Sentry',
+      'LogRocket',
+      'Mixpanel',
+      'Amplitude',
+      'Segment',
     ];
 
-    // Check filename first
+    // Check filename first (highest priority)
+    const filenameUpper = filename.toUpperCase();
     for (const provider of providers) {
-      if (filename.toUpperCase().includes(provider.toUpperCase())) {
+      if (filenameUpper.includes(provider.toUpperCase())) {
+        this.logger.debug(`Extracted provider from filename: ${provider}`);
         return provider;
       }
     }
 
-    // Check text content
+    // Check text content for provider names
+    const textUpper = text.toUpperCase();
     for (const provider of providers) {
-      if (text.toUpperCase().includes(provider.toUpperCase())) {
+      if (textUpper.includes(provider.toUpperCase())) {
+        this.logger.debug(`Extracted provider from text: ${provider}`);
         return provider;
       }
     }
 
-    // Try to extract from "From:" or "Vendor:" fields
+    // Try to extract from "From:" or "Vendor:" fields (improved patterns)
     const vendorPatterns = [
-      /(?:from|vendor|supplier|company)\s*:?\s*([A-Z][A-Za-z\s&]+)/i,
-      /^([A-Z][A-Za-z\s&]+)\s*(?:invoice|bill|statement)/i,
+      /(?:from|vendor|supplier|company|billed\s*by|issued\s*by)\s*:?\s*([A-Z][A-Za-z0-9\s&\.\-]+)/i,
+      /^([A-Z][A-Za-z0-9\s&\.\-]+)\s*(?:invoice|bill|statement|receipt)/i,
+      /(?:invoice\s*from|billed\s*by)\s*:?\s*([A-Z][A-Za-z0-9\s&\.\-]+)/i,
     ];
 
     for (const pattern of vendorPatterns) {
-      const match = text.match(pattern);
-      if (match && match[1]) {
-        const vendor = match[1].trim();
-        if (vendor.length > 2 && vendor.length < 50) {
-          return vendor;
+      const matches = text.matchAll(new RegExp(pattern.source, pattern.flags + 'g'));
+      for (const match of matches) {
+        if (match && match[1]) {
+          const vendor = match[1].trim();
+          // Filter out common false positives
+          if (
+            vendor.length > 2 &&
+            vendor.length < 50 &&
+            !vendor.toLowerCase().includes('invoice') &&
+            !vendor.toLowerCase().includes('bill') &&
+            !vendor.toLowerCase().includes('statement')
+          ) {
+            this.logger.debug(`Extracted provider from vendor pattern: ${vendor}`);
+            return vendor;
+          }
         }
       }
     }
 
+    this.logger.warn('Could not extract provider from invoice text');
     return undefined;
   }
 

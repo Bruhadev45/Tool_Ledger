@@ -57,6 +57,8 @@ export class CredentialsService {
         apiKey: encryptedApiKey,
         notes: encryptedNotes,
         tags: createDto.tags || [],
+        isPaid: createDto.isPaid ?? false,
+        hasAutopay: createDto.hasAutopay ?? false,
         organizationId,
         ownerId: userId,
       },
@@ -395,6 +397,8 @@ export class CredentialsService {
       updateData.notes = updateDto.notes ? this.encryptionService.encrypt(updateDto.notes) : null;
     }
     if (updateDto.tags) updateData.tags = updateDto.tags;
+    if (updateDto.isPaid !== undefined) updateData.isPaid = updateDto.isPaid;
+    if (updateDto.hasAutopay !== undefined) updateData.hasAutopay = updateDto.hasAutopay;
 
     return this.prisma.credential.update({
       where: { id },
