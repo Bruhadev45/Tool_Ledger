@@ -1,10 +1,10 @@
 /**
  * Main Application Bootstrap
- * 
+ *
  * Initializes the NestJS application with security middleware, CORS,
  * validation pipes, and global configuration. This is the entry point
  * for the backend API server.
- * 
+ *
  * @module Main
  */
 
@@ -19,7 +19,7 @@ const compression = require('compression');
 
 /**
  * Bootstrap function to initialize and start the NestJS application
- * 
+ *
  * Configures:
  * - Security headers (Helmet)
  * - Response compression
@@ -36,7 +36,7 @@ async function bootstrap() {
 
   // Security middleware: Helmet sets various HTTP headers for security
   app.use(helmet());
-  
+
   // Compression middleware: Reduces response size for better performance
   app.use(compression());
 
@@ -76,24 +76,29 @@ async function bootstrap() {
   app.setGlobalPrefix('api');
 
   // Root endpoint: Provides API information and available endpoints
-  app.getHttpAdapter().get('/', (req: unknown, res: { status: (code: number) => { json: (data: unknown) => void } }) => {
-    res.status(200).json({
-      message: 'ToolLedger API',
-      version: '2.0.0',
-      info: 'All API endpoints are prefixed with /api',
-      endpoints: {
-        health: '/api/health',
-        auth: '/api/auth',
-        analytics: '/api/analytics',
-        credentials: '/api/credentials',
-        invoices: '/api/invoices',
+  app
+    .getHttpAdapter()
+    .get(
+      '/',
+      (req: unknown, res: { status: (code: number) => { json: (data: unknown) => void } }) => {
+        res.status(200).json({
+          message: 'ToolLedger API',
+          version: '2.0.0',
+          info: 'All API endpoints are prefixed with /api',
+          endpoints: {
+            health: '/api/health',
+            auth: '/api/auth',
+            analytics: '/api/analytics',
+            credentials: '/api/credentials',
+            invoices: '/api/invoices',
+          },
+        });
       },
-    });
-  });
+    );
 
   // Start the server on configured port
   await app.listen(port);
-  
+
   // Log server startup information (console.log is acceptable for startup logs)
   console.log(`🚀 Server running on http://localhost:${port}`);
   console.log(`📡 API Base URL: http://localhost:${port}/api`);

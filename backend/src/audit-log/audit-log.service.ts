@@ -21,13 +21,16 @@ export class AuditLogService {
     });
   }
 
-  async findAll(organizationId: string, filters?: {
-    userId?: string;
-    resourceType?: string;
-    action?: AuditAction;
-    startDate?: Date;
-    endDate?: Date;
-  }) {
+  async findAll(
+    organizationId: string,
+    filters?: {
+      userId?: string;
+      resourceType?: string;
+      action?: AuditAction;
+      startDate?: Date;
+      endDate?: Date;
+    },
+  ) {
     const where: any = { organizationId };
 
     if (filters) {

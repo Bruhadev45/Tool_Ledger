@@ -38,7 +38,10 @@ export class StorageService {
     }
   }
 
-  async uploadFile(file: Express.Multer.File, pathPrefix: string): Promise<{ url: string; key: string }> {
+  async uploadFile(
+    file: Express.Multer.File,
+    pathPrefix: string,
+  ): Promise<{ url: string; key: string }> {
     if (this.useS3) {
       const key = `${pathPrefix}/${Date.now()}-${file.originalname}`;
 
@@ -71,7 +74,7 @@ export class StorageService {
 
       // Return relative path as key
       const key = `${pathPrefix}/${fileName}`;
-      
+
       return {
         url: key,
         key,

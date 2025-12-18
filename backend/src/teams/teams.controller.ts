@@ -23,10 +23,7 @@ export class TeamsController {
 
   @Post()
   @Roles(UserRole.ADMIN, UserRole.ACCOUNTANT)
-  create(
-    @CurrentUser() user: any,
-    @Body() body: { name: string; description?: string },
-  ) {
+  create(@CurrentUser() user: any, @Body() body: { name: string; description?: string }) {
     return this.teamsService.create(user.organizationId, body.name, body.description, user.role);
   }
 
@@ -37,7 +34,13 @@ export class TeamsController {
     @CurrentUser() user: any,
     @Body() body: { name?: string; description?: string },
   ) {
-    return this.teamsService.update(id, user.organizationId, body.name, body.description, user.role);
+    return this.teamsService.update(
+      id,
+      user.organizationId,
+      body.name,
+      body.description,
+      user.role,
+    );
   }
 
   @Delete(':id')
@@ -48,11 +51,7 @@ export class TeamsController {
 
   @Post(':id/users/:userId')
   @Roles(UserRole.ADMIN, UserRole.ACCOUNTANT)
-  addUser(
-    @Param('id') teamId: string,
-    @Param('userId') userId: string,
-    @CurrentUser() user: any,
-  ) {
+  addUser(@Param('id') teamId: string, @Param('userId') userId: string, @CurrentUser() user: any) {
     return this.teamsService.addUser(teamId, userId, user.organizationId, user.role);
   }
 

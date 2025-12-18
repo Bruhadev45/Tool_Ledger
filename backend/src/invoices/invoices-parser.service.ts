@@ -49,7 +49,9 @@ export class InvoicesParserService {
             this.logger.warn('PDF file has no buffer, using filename extraction');
             text = file.originalname;
           } else {
-            this.logger.debug(`Parsing PDF file: ${file.originalname}, size: ${file.buffer.length} bytes`);
+            this.logger.debug(
+              `Parsing PDF file: ${file.originalname}, size: ${file.buffer.length} bytes`,
+            );
             // pdf-parse v2.x: PDFParse is a class, use getText() method
             const parser = new PDFParse({ data: file.buffer });
             const pdfData = await parser.getText();
@@ -85,13 +87,15 @@ export class InvoicesParserService {
           this.logger.debug('Attempting OpenAI-powered parsing');
           const aiExtracted = await this.parseWithOpenAI(text, file.originalname);
           // Merge AI results with regex fallback
-          extractedData.invoiceNumber = aiExtracted.invoiceNumber || this.extractInvoiceNumber(text);
-          
+          extractedData.invoiceNumber =
+            aiExtracted.invoiceNumber || this.extractInvoiceNumber(text);
+
           // Ensure amount is a valid number
           const aiAmount = aiExtracted.amount;
           const regexAmount = this.extractAmount(text);
           if (aiAmount !== null && aiAmount !== undefined) {
-            const numAmount = typeof aiAmount === 'number' ? aiAmount : parseFloat(String(aiAmount));
+            const numAmount =
+              typeof aiAmount === 'number' ? aiAmount : parseFloat(String(aiAmount));
             if (!isNaN(numAmount) && isFinite(numAmount) && numAmount > 0) {
               extractedData.amount = Math.round(numAmount * 100) / 100;
             } else if (regexAmount) {
@@ -100,27 +104,30 @@ export class InvoicesParserService {
           } else if (regexAmount) {
             extractedData.amount = regexAmount;
           }
-          
+
           extractedData.currency = 'USD'; // Always use USD
-          extractedData.provider = aiExtracted.provider || this.extractProvider(text, file.originalname);
+          extractedData.provider =
+            aiExtracted.provider || this.extractProvider(text, file.originalname);
           extractedData.billingDate = aiExtracted.billingDate || this.extractDate(text, 'billing');
           extractedData.dueDate = aiExtracted.dueDate || this.extractDate(text, 'due');
-          extractedData.category = aiExtracted.category || this.extractCategory(text, extractedData.provider);
+          extractedData.category =
+            aiExtracted.category || this.extractCategory(text, extractedData.provider);
           this.logger.debug('OpenAI parsing completed');
         } catch (error) {
           this.logger.warn(`OpenAI parsing failed, using regex fallback: ${error.message}`);
           // Fallback to regex extraction
           extractedData.invoiceNumber = this.extractInvoiceNumber(text);
-          
+
           // Ensure amount is a valid number
           const regexAmount = this.extractAmount(text);
           if (regexAmount !== null && regexAmount !== undefined) {
-            const numAmount = typeof regexAmount === 'number' ? regexAmount : parseFloat(String(regexAmount));
+            const numAmount =
+              typeof regexAmount === 'number' ? regexAmount : parseFloat(String(regexAmount));
             if (!isNaN(numAmount) && isFinite(numAmount) && numAmount > 0) {
               extractedData.amount = Math.round(numAmount * 100) / 100;
             }
           }
-          
+
           extractedData.currency = 'USD'; // Always use USD
           extractedData.provider = this.extractProvider(text, file.originalname);
           extractedData.billingDate = this.extractDate(text, 'billing');
@@ -130,16 +137,17 @@ export class InvoicesParserService {
       } else {
         // Use regex patterns for extraction
         extractedData.invoiceNumber = this.extractInvoiceNumber(text);
-        
+
         // Ensure amount is a valid number
         const regexAmount = this.extractAmount(text);
         if (regexAmount !== null && regexAmount !== undefined) {
-          const numAmount = typeof regexAmount === 'number' ? regexAmount : parseFloat(String(regexAmount));
+          const numAmount =
+            typeof regexAmount === 'number' ? regexAmount : parseFloat(String(regexAmount));
           if (!isNaN(numAmount) && isFinite(numAmount) && numAmount > 0) {
             extractedData.amount = Math.round(numAmount * 100) / 100;
           }
         }
-        
+
         extractedData.currency = 'USD'; // Always use USD
         extractedData.provider = this.extractProvider(text, file.originalname);
         extractedData.billingDate = this.extractDate(text, 'billing');
@@ -155,7 +163,6 @@ export class InvoicesParserService {
       return extractedData;
     }
   }
-
 
   private extractInvoiceNumber(text: string): string | undefined {
     // Common patterns: INV-2024-001, Invoice #12345, Invoice Number: INV-001, etc.
@@ -201,7 +208,9 @@ export class InvoicesParserService {
             !/^\d{4}-\d{2}-\d{2}$/.test(candidate) && // Not ISO date
             !/^[A-Z]{3}$/.test(candidate) // Not a currency code
           ) {
-            this.logger.debug(`Extracted invoice number: ${candidate} using pattern: ${pattern.source}`);
+            this.logger.debug(
+              `Extracted invoice number: ${candidate} using pattern: ${pattern.source}`,
+            );
             return candidate;
           }
         }
@@ -255,13 +264,18 @@ export class InvoicesParserService {
         if (match && match[1]) {
           const amountStr = match[1].replace(/,/g, '').trim();
           const amount = parseFloat(amountStr);
-          
-          if (!isNaN(amount) && amount > 0 && amount < 1000000000) { // Reasonable upper limit
+
+          if (!isNaN(amount) && amount > 0 && amount < 1000000000) {
+            // Reasonable upper limit
             // Higher confidence for amounts with currency indicators
-            const confidence = pattern.source.includes('total|amount|balance') ? 10 : 
-                              pattern.source.includes('[₹$€£]') ? 9 :
-                              pattern.source.includes('USD|INR|EUR') ? 8 : 5;
-            
+            const confidence = pattern.source.includes('total|amount|balance')
+              ? 10
+              : pattern.source.includes('[₹$€£]')
+                ? 9
+                : pattern.source.includes('USD|INR|EUR')
+                  ? 8
+                  : 5;
+
             if (!bestMatch || confidence > bestMatch.confidence) {
               bestMatch = { amount, confidence };
             }
@@ -271,7 +285,9 @@ export class InvoicesParserService {
     }
 
     if (bestMatch) {
-      this.logger.debug(`Extracted amount: ${bestMatch.amount} with confidence: ${bestMatch.confidence}`);
+      this.logger.debug(
+        `Extracted amount: ${bestMatch.amount} with confidence: ${bestMatch.confidence}`,
+      );
       return bestMatch.amount;
     }
 
@@ -291,13 +307,41 @@ export class InvoicesParserService {
   private extractProvider(text: string, filename: string): string | undefined {
     // Common provider names
     const providers = [
-      'AWS', 'Amazon Web Services', 'Microsoft Azure', 'Google Cloud', 'GCP',
-      'GitHub', 'GitLab', 'Stripe', 'PayPal', 'SendGrid', 'Twilio',
-      'MongoDB', 'PostgreSQL', 'MySQL', 'Redis', 'Elasticsearch',
-      'Slack', 'Discord', 'Microsoft Teams', 'Zoom',
-      'ChatGPT', 'OpenAI', 'Anthropic', 'Claude', 'Orchids', 'Cursor',
-      'Figma', 'Adobe', 'Canva', 'Notion', 'Airtable',
-      'Salesforce', 'HubSpot', 'Zendesk', 'Intercom',
+      'AWS',
+      'Amazon Web Services',
+      'Microsoft Azure',
+      'Google Cloud',
+      'GCP',
+      'GitHub',
+      'GitLab',
+      'Stripe',
+      'PayPal',
+      'SendGrid',
+      'Twilio',
+      'MongoDB',
+      'PostgreSQL',
+      'MySQL',
+      'Redis',
+      'Elasticsearch',
+      'Slack',
+      'Discord',
+      'Microsoft Teams',
+      'Zoom',
+      'ChatGPT',
+      'OpenAI',
+      'Anthropic',
+      'Claude',
+      'Orchids',
+      'Cursor',
+      'Figma',
+      'Adobe',
+      'Canva',
+      'Notion',
+      'Airtable',
+      'Salesforce',
+      'HubSpot',
+      'Zendesk',
+      'Intercom',
     ];
 
     // Check filename first
@@ -402,19 +446,27 @@ export class InvoicesParserService {
           // If day > 12, it's definitely DD/MM/YYYY
           const day = parseInt(parts[0], 10);
           const month = parseInt(parts[1], 10);
-          
+
           if (day > 12) {
             // Definitely DD/MM/YYYY
-            date = new Date(`${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`);
+            date = new Date(
+              `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`,
+            );
           } else if (month > 12) {
             // Definitely MM/DD/YYYY
-            date = new Date(`${parts[2]}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}`);
+            date = new Date(
+              `${parts[2]}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}`,
+            );
           } else {
             // Ambiguous - try DD/MM/YYYY first (more common internationally)
-            date = new Date(`${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`);
+            date = new Date(
+              `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`,
+            );
             // If invalid, try MM/DD/YYYY
             if (isNaN(date.getTime())) {
-              date = new Date(`${parts[2]}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}`);
+              date = new Date(
+                `${parts[2]}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}`,
+              );
             }
           }
         } else {
@@ -438,32 +490,32 @@ export class InvoicesParserService {
   private extractCategory(text: string, provider?: string): string | undefined {
     // Map providers to categories
     const categoryMap: Record<string, string> = {
-      'AWS': 'Cloud Services',
+      AWS: 'Cloud Services',
       'Amazon Web Services': 'Cloud Services',
       'Microsoft Azure': 'Cloud Services',
       'Google Cloud': 'Cloud Services',
-      'GCP': 'Cloud Services',
-      'GitHub': 'Development Tools',
-      'GitLab': 'Development Tools',
-      'ChatGPT': 'AI Tools',
-      'OpenAI': 'AI Tools',
-      'Anthropic': 'AI Tools',
-      'Claude': 'AI Tools',
-      'Orchids': 'AI Tools',
-      'Cursor': 'Development Tools',
+      GCP: 'Cloud Services',
+      GitHub: 'Development Tools',
+      GitLab: 'Development Tools',
+      ChatGPT: 'AI Tools',
+      OpenAI: 'AI Tools',
+      Anthropic: 'AI Tools',
+      Claude: 'AI Tools',
+      Orchids: 'AI Tools',
+      Cursor: 'Development Tools',
       'GitHub Copilot': 'Development Tools',
-      'Stripe': 'Payment Processing',
-      'PayPal': 'Payment Processing',
-      'SendGrid': 'Email Services',
-      'Twilio': 'Communication',
-      'Slack': 'Communication',
-      'Discord': 'Communication',
-      'MongoDB': 'Database Services',
-      'PostgreSQL': 'Database Services',
-      'MySQL': 'Database Services',
-      'Figma': 'Design Tools',
-      'Adobe': 'Design Tools',
-      'Canva': 'Design Tools',
+      Stripe: 'Payment Processing',
+      PayPal: 'Payment Processing',
+      SendGrid: 'Email Services',
+      Twilio: 'Communication',
+      Slack: 'Communication',
+      Discord: 'Communication',
+      MongoDB: 'Database Services',
+      PostgreSQL: 'Database Services',
+      MySQL: 'Database Services',
+      Figma: 'Design Tools',
+      Adobe: 'Design Tools',
+      Canva: 'Design Tools',
     };
 
     if (provider) {
@@ -481,7 +533,7 @@ export class InvoicesParserService {
       'AI Tools': ['ai', 'artificial intelligence', 'machine learning', 'ml'],
       'Payment Processing': ['payment', 'stripe', 'paypal', 'billing'],
       'Email Services': ['email', 'sendgrid', 'mail'],
-      'Communication': ['slack', 'discord', 'messaging', 'chat'],
+      Communication: ['slack', 'discord', 'messaging', 'chat'],
       'Database Services': ['database', 'db', 'mongodb', 'postgresql'],
       'Design Tools': ['design', 'figma', 'adobe', 'creative'],
     };
@@ -504,7 +556,9 @@ export class InvoicesParserService {
   private async extractTextWithOCR(imageBuffer: Buffer): Promise<string> {
     try {
       const worker = await createWorker('eng');
-      const { data: { text } } = await worker.recognize(imageBuffer);
+      const {
+        data: { text },
+      } = await worker.recognize(imageBuffer);
       await worker.terminate();
       return text;
     } catch (error) {
@@ -516,7 +570,10 @@ export class InvoicesParserService {
   /**
    * Parse invoice text using OpenAI for better extraction
    */
-  private async parseWithOpenAI(text: string, filename: string): Promise<{
+  private async parseWithOpenAI(
+    text: string,
+    filename: string,
+  ): Promise<{
     invoiceNumber?: string;
     amount?: number;
     currency?: string;
@@ -550,7 +607,8 @@ Return only valid JSON, no additional text. If a field cannot be determined, use
         messages: [
           {
             role: 'system',
-            content: 'You are an expert at extracting structured data from invoices. Always return valid JSON only.',
+            content:
+              'You are an expert at extracting structured data from invoices. Always return valid JSON only.',
           },
           {
             role: 'user',
@@ -568,7 +626,7 @@ Return only valid JSON, no additional text. If a field cannot be determined, use
       }
 
       const parsed = JSON.parse(content);
-      
+
       // Normalize the response
       const result: any = {};
       if (parsed.invoiceNumber) {
@@ -578,11 +636,11 @@ Return only valid JSON, no additional text. If a field cannot be determined, use
           result.invoiceNumber = cleaned;
         }
       }
-      
+
       // Ensure amount is a valid number
       if (parsed.amount !== null && parsed.amount !== undefined) {
         let amountValue: number;
-        
+
         if (typeof parsed.amount === 'number') {
           amountValue = parsed.amount;
         } else if (typeof parsed.amount === 'string') {
@@ -592,15 +650,20 @@ Return only valid JSON, no additional text. If a field cannot be determined, use
         } else {
           amountValue = parseFloat(String(parsed.amount).replace(/[₹$€£¥,\s]/g, ''));
         }
-        
-        if (!isNaN(amountValue) && isFinite(amountValue) && amountValue > 0 && amountValue < 1000000000) {
+
+        if (
+          !isNaN(amountValue) &&
+          isFinite(amountValue) &&
+          amountValue > 0 &&
+          amountValue < 1000000000
+        ) {
           // Round to 2 decimal places
           result.amount = Math.round(amountValue * 100) / 100;
         } else {
           this.logger.warn(`Invalid amount extracted: ${parsed.amount}, skipping`);
         }
       }
-      
+
       if (parsed.currency) {
         const currency = String(parsed.currency).toUpperCase().trim();
         // Validate currency code
@@ -616,8 +679,11 @@ Return only valid JSON, no additional text. If a field cannot be determined, use
         result.currency = 'USD';
       }
       if (parsed.provider) result.provider = String(parsed.provider);
-      if (parsed.billingDate) result.billingDate = this.normalizeDate(String(parsed.billingDate)) || String(parsed.billingDate);
-      if (parsed.dueDate) result.dueDate = this.normalizeDate(String(parsed.dueDate)) || String(parsed.dueDate);
+      if (parsed.billingDate)
+        result.billingDate =
+          this.normalizeDate(String(parsed.billingDate)) || String(parsed.billingDate);
+      if (parsed.dueDate)
+        result.dueDate = this.normalizeDate(String(parsed.dueDate)) || String(parsed.dueDate);
       if (parsed.category) result.category = String(parsed.category);
 
       return result;

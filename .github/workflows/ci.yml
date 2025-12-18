@@ -34,6 +34,8 @@ jobs:
           cd backend
           npm run lint || echo "Linting completed with warnings"
         continue-on-error: true
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/test
       
       - name: Install frontend dependencies
         run: |

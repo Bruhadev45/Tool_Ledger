@@ -1,9 +1,9 @@
 /**
  * AI Assistant Module
- * 
+ *
  * Provides AI-powered insights and question answering capabilities.
  * Integrates with OpenAI for intelligent analysis of credentials, invoices, and spending.
- * 
+ *
  * @module AiAssistantModule
  */
 

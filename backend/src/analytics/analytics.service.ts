@@ -159,43 +159,44 @@ export class AnalyticsService {
   }
 
   async getAccountantDashboard(organizationId: string) {
-    const [adminSpend, departmentSpend, monthlyTrends, totalSpend, adminComparison] = await Promise.all([
-      // Admin-wise monthly spends
-      this.getAdminMonthlySpend(organizationId),
+    const [adminSpend, departmentSpend, monthlyTrends, totalSpend, adminComparison] =
+      await Promise.all([
+        // Admin-wise monthly spends
+        this.getAdminMonthlySpend(organizationId),
 
-      // Department-wise categorization
-      this.prisma.invoice.groupBy({
-        by: ['category'],
-        where: {
-          organizationId,
-          status: InvoiceStatus.APPROVED,
-          category: { not: null },
-        },
-        _sum: {
-          amount: true,
-        },
-        _count: {
-          id: true,
-        },
-      }),
+        // Department-wise categorization
+        this.prisma.invoice.groupBy({
+          by: ['category'],
+          where: {
+            organizationId,
+            status: InvoiceStatus.APPROVED,
+            category: { not: null },
+          },
+          _sum: {
+            amount: true,
+          },
+          _count: {
+            id: true,
+          },
+        }),
 
-      // Month-over-month trends
-      this.getMonthlyTrends(organizationId),
+        // Month-over-month trends
+        this.getMonthlyTrends(organizationId),
 
-      // Total organization spend
-      this.prisma.invoice.aggregate({
-        where: {
-          organizationId,
-          status: InvoiceStatus.APPROVED,
-        },
-        _sum: {
-          amount: true,
-        },
-      }),
+        // Total organization spend
+        this.prisma.invoice.aggregate({
+          where: {
+            organizationId,
+            status: InvoiceStatus.APPROVED,
+          },
+          _sum: {
+            amount: true,
+          },
+        }),
 
-      // Admin comparison data
-      this.getAdminComparisonData(organizationId),
-    ]);
+        // Admin comparison data
+        this.getAdminComparisonData(organizationId),
+      ]);
 
     return {
       adminSpend,
@@ -293,8 +294,7 @@ export class AnalyticsService {
         if (!adminMonthly[adminId]) {
           adminMonthly[adminId] = {};
         }
-        adminMonthly[adminId][month] =
-          (adminMonthly[adminId][month] || 0) + Number(invoice.amount);
+        adminMonthly[adminId][month] = (adminMonthly[adminId][month] || 0) + Number(invoice.amount);
       }
     });
 
@@ -322,7 +322,7 @@ export class AnalyticsService {
     });
 
     const adminMonthlyData: any[] = [];
-    
+
     for (const admin of admins) {
       const invoices = await this.prisma.invoice.findMany({
         where: {

@@ -1,6 +1,6 @@
 /**
  * Update User Role DTO
- * 
+ *
  * Data transfer object for updating a user's role.
  */
 

@@ -1,6 +1,6 @@
 /**
  * Users DTOs
- * 
+ *
  * Centralized export for all user-related data transfer objects.
  */
 

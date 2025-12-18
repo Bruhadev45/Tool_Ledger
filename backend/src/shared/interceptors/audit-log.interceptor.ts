@@ -1,9 +1,4 @@
-import {
-  Injectable,
-  NestInterceptor,
-  ExecutionContext,
-  CallHandler,
-} from '@nestjs/common';
+import { Injectable, NestInterceptor, ExecutionContext, CallHandler } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
 import { AuditLogService } from '../../audit-log/audit-log.service';
@@ -61,7 +56,9 @@ export class AuditLogInterceptor implements NestInterceptor {
   private extractResourceId(url: string, request: any): string {
     // Try to get ID from URL params or body
     const urlParts = url.split('/').filter(Boolean);
-    const idIndex = urlParts.findIndex((p) => p.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i));
+    const idIndex = urlParts.findIndex((p) =>
+      p.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i),
+    );
     if (idIndex !== -1) {
       return urlParts[idIndex];
     }

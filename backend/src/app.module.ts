@@ -1,10 +1,10 @@
 /**
  * Application Root Module
- * 
+ *
  * Main NestJS module that imports and configures all feature modules,
  * global modules (Config, Throttler), and shared modules (Prisma, Encryption).
  * This is the root of the dependency injection container.
- * 
+ *
  * @module AppModule
  */
 
@@ -44,7 +44,7 @@ import { AppController } from './app.controller';
     // Shared modules: Available throughout the application
     PrismaModule, // Database ORM and connection management
     EncryptionModule, // AES-256 encryption service for sensitive data
-    
+
     // Feature modules: Business logic and API endpoints
     AuthModule, // Authentication, MFA, password management
     UsersModule, // User management and RBAC

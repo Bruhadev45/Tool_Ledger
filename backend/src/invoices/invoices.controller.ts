@@ -35,12 +35,7 @@ export class InvoicesController {
     @Body() createDto: CreateInvoiceDto,
     @UploadedFile() file?: Express.Multer.File,
   ) {
-    return this.invoicesService.create(
-      user.id,
-      user.organizationId,
-      createDto,
-      file,
-    );
+    return this.invoicesService.create(user.id, user.organizationId, createDto, file);
   }
 
   @Get()
@@ -87,11 +82,7 @@ export class InvoicesController {
   }
 
   @Patch(':id')
-  update(
-    @Param('id') id: string,
-    @CurrentUser() user: any,
-    @Body() updateDto: UpdateInvoiceDto,
-  ) {
+  update(@Param('id') id: string, @CurrentUser() user: any, @Body() updateDto: UpdateInvoiceDto) {
     return this.invoicesService.update(id, user.id, user.organizationId, user.role, updateDto);
   }
 
@@ -107,11 +98,7 @@ export class InvoicesController {
 
   @Post(':id/reject')
   @Roles(UserRole.ADMIN)
-  reject(
-    @Param('id') id: string,
-    @CurrentUser() user: any,
-    @Body() body: { reason: string },
-  ) {
+  reject(@Param('id') id: string, @CurrentUser() user: any, @Body() body: { reason: string }) {
     return this.invoicesService.reject(id, user.id, user.organizationId, body.reason);
   }
 }

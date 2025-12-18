@@ -1,4 +1,12 @@
-import { IsString, IsNumber, IsOptional, IsDateString, IsArray, IsUUID, Min } from 'class-validator';
+import {
+  IsString,
+  IsNumber,
+  IsOptional,
+  IsDateString,
+  IsArray,
+  IsUUID,
+  Min,
+} from 'class-validator';
 import { Type, Transform } from 'class-transformer';
 import { ParseArrayPipe } from '@nestjs/common';
 
@@ -15,7 +23,10 @@ export class CreateInvoiceDto {
     }
     return typeof value === 'number' ? value : parseFloat(value);
   })
-  @IsNumber({ maxDecimalPlaces: 2 }, { message: 'Amount must be a valid number with up to 2 decimal places' })
+  @IsNumber(
+    { maxDecimalPlaces: 2 },
+    { message: 'Amount must be a valid number with up to 2 decimal places' },
+  )
   @Type(() => Number)
   @Min(0.01, { message: 'Amount must be greater than 0' })
   amount: number;
@@ -43,7 +54,7 @@ export class CreateInvoiceDto {
     if (!value) return undefined;
     // Handle FormData array: can be string, string[], or undefined
     if (Array.isArray(value)) {
-      return value.filter(v => v && typeof v === 'string');
+      return value.filter((v) => v && typeof v === 'string');
     }
     if (typeof value === 'string' && value.trim()) {
       return [value];

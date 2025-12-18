@@ -1,9 +1,9 @@
 /**
  * Authentication Service
- * 
+ *
  * Handles user authentication, registration, password management, and MFA operations.
  * Provides secure authentication using JWT tokens, bcrypt password hashing, and TOTP-based MFA.
- * 
+ *
  * @module AuthService
  */
 
@@ -28,10 +28,10 @@ export class AuthService {
 
   /**
    * Validates user credentials during login
-   * 
+   *
    * Checks if user exists, is active, and password matches.
    * Returns user data without password hash for security.
-   * 
+   *
    * @param email - User's email address
    * @param password - User's plain text password
    * @returns User object without password hash
@@ -58,14 +58,22 @@ export class AuthService {
 
   /**
    * Generates JWT tokens and returns user data after successful authentication
-   * 
+   *
    * Creates access token (short-lived) and refresh token (long-lived) for the user.
    * Access token contains user identity and role information.
-   * 
+   *
    * @param user - Authenticated user object
    * @returns Object containing access_token, refresh_token, and user data
    */
-  async login(user: { id: string; email: string; firstName: string; lastName: string; role: UserRole; organizationId: string; mfaEnabled: boolean }) {
+  async login(user: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    role: UserRole;
+    organizationId: string;
+    mfaEnabled: boolean;
+  }) {
     // Create JWT payload with user information
     const payload = {
       email: user.email,
@@ -91,10 +99,10 @@ export class AuthService {
 
   /**
    * Registers a new user and creates/assigns to organization
-   * 
+   *
    * Multi-tenant registration: Users are automatically assigned to organizations
    * based on their email domain. If organization doesn't exist, it's created.
-   * 
+   *
    * @param email - User's email address (used for domain extraction)
    * @param password - Plain text password (will be hashed)
    * @param firstName - User's first name
@@ -163,10 +171,10 @@ export class AuthService {
 
   /**
    * Generates a refresh token for long-term session management
-   * 
+   *
    * Refresh tokens are stored in database and used to obtain new access tokens
    * without requiring user to login again. Default expiry is 7 days.
-   * 
+   *
    * @param userId - ID of the user requesting refresh token
    * @returns JWT refresh token string
    */
@@ -198,10 +206,10 @@ export class AuthService {
 
   /**
    * Refreshes an expired access token using a valid refresh token
-   * 
+   *
    * Validates the refresh token, checks if it's not expired, and generates
    * a new access token. This allows users to stay logged in without re-entering credentials.
-   * 
+   *
    * @param refreshToken - JWT refresh token from previous login
    * @returns New access token
    * @throws UnauthorizedException if refresh token is invalid or expired
@@ -248,10 +256,10 @@ export class AuthService {
 
   /**
    * Sets up Multi-Factor Authentication (MFA) for a user
-   * 
+   *
    * Generates a TOTP secret, backup codes, and QR code for authenticator apps.
    * MFA is not enabled until user verifies with a code (via enableMFA).
-   * 
+   *
    * @param userId - ID of the user setting up MFA
    * @returns Object containing secret, QR code URL, and backup codes
    * @throws BadRequestException if user not found
@@ -295,10 +303,10 @@ export class AuthService {
 
   /**
    * Verifies a TOTP MFA token for a user
-   * 
+   *
    * Validates the 6-digit code from user's authenticator app against stored secret.
    * Uses a time window of 3 steps (90 seconds) to account for clock drift.
-   * 
+   *
    * @param userId - ID of the user verifying MFA
    * @param token - 6-digit TOTP code from authenticator app
    * @returns True if token is valid, false otherwise
@@ -336,7 +344,10 @@ export class AuthService {
     } catch (error) {
       // Log error but don't expose details to prevent timing attacks
       if (process.env.NODE_ENV === 'development') {
-        this.logger.error('MFA verification error', error instanceof Error ? error.stack : String(error));
+        this.logger.error(
+          'MFA verification error',
+          error instanceof Error ? error.stack : String(error),
+        );
       }
       return false;
     }
@@ -425,7 +436,10 @@ export class AuthService {
           return true;
         }
       } catch (error) {
-        this.logger.error('Error parsing backup codes', error instanceof Error ? error.stack : String(error));
+        this.logger.error(
+          'Error parsing backup codes',
+          error instanceof Error ? error.stack : String(error),
+        );
       }
     }
 
@@ -449,10 +463,10 @@ export class AuthService {
 
   /**
    * Changes user's password after verifying current password
-   * 
+   *
    * Requires current password verification for security. Ensures new password
    * is different from current password. Password strength is validated by DTO.
-   * 
+   *
    * @param userId - ID of the user changing password
    * @param currentPassword - User's current password for verification
    * @param newPassword - New password to set (must meet strength requirements)
@@ -496,11 +510,11 @@ export class AuthService {
 
   /**
    * Requests a password reset token for a user
-   * 
+   *
    * Generates a time-limited JWT token (1 hour expiry) for password reset.
    * For security, doesn't reveal if email exists in system.
    * In production, token should be sent via email (not returned in response).
-   * 
+   *
    * @param email - Email address of user requesting password reset
    * @returns Success message (and token in development mode only)
    */
@@ -511,7 +525,9 @@ export class AuthService {
 
     // Security best practice: Don't reveal if user exists to prevent email enumeration
     if (!user) {
-      return { message: 'If an account with that email exists, a password reset link has been sent.' };
+      return {
+        message: 'If an account with that email exists, a password reset link has been sent.',
+      };
     }
 
     // Generate JWT reset token with 1-hour expiration
@@ -536,10 +552,10 @@ export class AuthService {
 
   /**
    * Resets user password using a valid reset token
-   * 
+   *
    * Verifies the reset token (JWT), checks expiration and email match,
    * then updates the user's password. Token must be used within 1 hour.
-   * 
+   *
    * @param token - JWT reset token from requestPasswordReset
    * @param email - Email address of user (must match token)
    * @param newPassword - New password to set (validated by DTO)
@@ -550,7 +566,7 @@ export class AuthService {
     try {
       // Verify JWT token signature and expiration
       const payload = this.jwtService.verify(token);
-      
+
       // Ensure token is a password-reset token and email matches
       if (payload.type !== 'password-reset' || payload.email !== email) {
         throw new UnauthorizedException('Invalid reset token');

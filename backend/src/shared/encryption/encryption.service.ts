@@ -12,7 +12,7 @@ export class EncryptionService {
     if (!encryptionKey) {
       throw new Error('ENCRYPTION_KEY is required');
     }
-    
+
     // Handle base64 encoded keys (common practice)
     let keyBuffer: Buffer;
     try {
@@ -26,11 +26,11 @@ export class EncryptionService {
       // If base64 decode fails, use UTF-8
       keyBuffer = Buffer.from(encryptionKey, 'utf8');
     }
-    
+
     if (keyBuffer.length !== 32) {
       throw new Error('ENCRYPTION_KEY must be exactly 32 bytes (or 44 characters base64 encoded)');
     }
-    
+
     this.key = keyBuffer;
   }
 

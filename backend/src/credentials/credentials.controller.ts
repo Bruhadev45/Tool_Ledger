@@ -24,28 +24,16 @@ export class CredentialsController {
 
   @Post()
   create(@CurrentUser() user: any, @Body() createDto: CreateCredentialDto) {
-    return this.credentialsService.create(
-      user.id,
-      user.organizationId,
-      createDto,
-    );
+    return this.credentialsService.create(user.id, user.organizationId, createDto);
   }
 
   @Get()
   findAll(@CurrentUser() user: any) {
-    return this.credentialsService.findAll(
-      user.id,
-      user.organizationId,
-      user.role,
-    );
+    return this.credentialsService.findAll(user.id, user.organizationId, user.role);
   }
 
   @Get(':id')
-  findOne(
-    @Param('id') id: string,
-    @CurrentUser() user: any,
-    @Query('decrypt') decrypt?: string,
-  ) {
+  findOne(@Param('id') id: string, @CurrentUser() user: any, @Query('decrypt') decrypt?: string) {
     return this.credentialsService.findOne(
       id,
       user.id,
@@ -61,38 +49,17 @@ export class CredentialsController {
     @CurrentUser() user: any,
     @Body() updateDto: UpdateCredentialDto,
   ) {
-    return this.credentialsService.update(
-      id,
-      user.id,
-      user.organizationId,
-      user.role,
-      updateDto,
-    );
+    return this.credentialsService.update(id, user.id, user.organizationId, user.role, updateDto);
   }
 
   @Delete(':id')
   remove(@Param('id') id: string, @CurrentUser() user: any) {
-    return this.credentialsService.remove(
-      id,
-      user.id,
-      user.organizationId,
-      user.role,
-    );
+    return this.credentialsService.remove(id, user.id, user.organizationId, user.role);
   }
 
   @Post(':id/share')
-  share(
-    @Param('id') id: string,
-    @CurrentUser() user: any,
-    @Body() shareDto: ShareCredentialDto,
-  ) {
-    return this.credentialsService.share(
-      id,
-      user.id,
-      user.organizationId,
-      user.role,
-      shareDto,
-    );
+  share(@Param('id') id: string, @CurrentUser() user: any, @Body() shareDto: ShareCredentialDto) {
+    return this.credentialsService.share(id, user.id, user.organizationId, user.role, shareDto);
   }
 
   @Post(':id/revoke/user/:userId')

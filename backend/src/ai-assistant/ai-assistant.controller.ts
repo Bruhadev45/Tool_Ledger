@@ -11,18 +11,11 @@ export class AiAssistantController {
 
   @Get('insights')
   async getInsights(@CurrentUser() user: any) {
-    return this.aiAssistantService.getInsights(
-      user.id,
-      user.organizationId,
-      user.role,
-    );
+    return this.aiAssistantService.getInsights(user.id, user.organizationId, user.role);
   }
 
   @Post('ask')
-  async askQuestion(
-    @CurrentUser() user: any,
-    @Body() body: { question: string },
-  ) {
+  async askQuestion(@CurrentUser() user: any, @Body() body: { question: string }) {
     if (!body.question || !body.question.trim()) {
       return { error: 'Question is required' };
     }

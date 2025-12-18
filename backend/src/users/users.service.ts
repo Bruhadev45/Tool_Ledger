@@ -1,14 +1,19 @@
 /**
  * Users Service
- * 
+ *
  * Handles user management operations including CRUD operations, role management,
  * and user status updates. Enforces role-based access control (RBAC) and
  * multi-tenant isolation by organization.
- * 
+ *
  * @module UsersService
  */
 
-import { Injectable, ForbiddenException, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  ForbiddenException,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UserRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
@@ -19,10 +24,10 @@ export class UsersService {
 
   /**
    * Get all users in an organization
-   * 
+   *
    * Returns list of users with their basic information and team assignments.
    * Only accessible by Admins and Accountants for security.
-   * 
+   *
    * @param organizationId - ID of the organization (multi-tenant isolation)
    * @param requesterRole - Role of the user making the request
    * @returns Array of user objects without sensitive data
@@ -58,10 +63,10 @@ export class UsersService {
 
   /**
    * Create a new user in the organization
-   * 
+   *
    * Creates a new user account with hashed password. Optionally assigns user
    * to a team. Validates email uniqueness and team existence.
-   * 
+   *
    * @param organizationId - ID of the organization (multi-tenant isolation)
    * @param data - User creation data (email, password, name, role, optional teamId)
    * @param requesterRole - Role of the user making the request
@@ -71,7 +76,14 @@ export class UsersService {
    */
   async create(
     organizationId: string,
-    data: { email: string; password: string; firstName: string; lastName: string; role: UserRole; teamId?: string },
+    data: {
+      email: string;
+      password: string;
+      firstName: string;
+      lastName: string;
+      role: UserRole;
+      teamId?: string;
+    },
     requesterRole: UserRole,
   ) {
     // Role-based access control: Only Admins and Accountants can create users
@@ -135,17 +147,17 @@ export class UsersService {
 
   /**
    * Get all active members of an organization
-   * 
+   *
    * Returns a simplified list of active users for sharing purposes.
    * Used when users need to select recipients for credential/invoice sharing.
-   * 
+   *
    * @param organizationId - ID of the organization
    * @returns Array of active user objects with basic information
    */
   async findOrganizationMembers(organizationId: string) {
     // All users in the organization can see other members for sharing purposes
     return this.prisma.user.findMany({
-      where: { 
+      where: {
         organizationId,
         isActive: true, // Only show active users
       },
@@ -162,10 +174,10 @@ export class UsersService {
 
   /**
    * Get a single user by ID
-   * 
+   *
    * Returns user information if they exist in the specified organization.
    * Enforces multi-tenant isolation.
-   * 
+   *
    * @param id - User ID
    * @param organizationId - ID of the organization (multi-tenant isolation)
    * @returns User object or null if not found
@@ -190,10 +202,10 @@ export class UsersService {
 
   /**
    * Update a user's role
-   * 
+   *
    * Changes the role of a user (e.g., USER to ACCOUNTANT).
    * Only Admins and Accountants can perform this operation.
-   * 
+   *
    * @param userId - ID of the user to update
    * @param organizationId - ID of the organization (multi-tenant isolation)
    * @param newRole - New role to assign
@@ -202,7 +214,12 @@ export class UsersService {
    * @throws ForbiddenException if requester is not Admin or Accountant
    * @throws NotFoundException if user not found
    */
-  async updateRole(userId: string, organizationId: string, newRole: UserRole, requesterRole: UserRole) {
+  async updateRole(
+    userId: string,
+    organizationId: string,
+    newRole: UserRole,
+    requesterRole: UserRole,
+  ) {
     // Role-based access control
     if (requesterRole !== UserRole.ADMIN && requesterRole !== UserRole.ACCOUNTANT) {
       throw new ForbiddenException('Only admins and accountants can update user roles');
@@ -234,10 +251,10 @@ export class UsersService {
 
   /**
    * Update a user's active status
-   * 
+   *
    * Activates or deactivates a user account. Deactivated users cannot login.
    * Only Admins and Accountants can perform this operation.
-   * 
+   *
    * @param userId - ID of the user to update
    * @param organizationId - ID of the organization (multi-tenant isolation)
    * @param isActive - New active status (true = active, false = inactive)
@@ -246,7 +263,12 @@ export class UsersService {
    * @throws ForbiddenException if requester is not Admin or Accountant
    * @throws NotFoundException if user not found
    */
-  async updateStatus(userId: string, organizationId: string, isActive: boolean, requesterRole: UserRole) {
+  async updateStatus(
+    userId: string,
+    organizationId: string,
+    isActive: boolean,
+    requesterRole: UserRole,
+  ) {
     // Role-based access control
     if (requesterRole !== UserRole.ADMIN && requesterRole !== UserRole.ACCOUNTANT) {
       throw new ForbiddenException('Only admins and accountants can update user status');
@@ -278,10 +300,10 @@ export class UsersService {
 
   /**
    * Delete a user from the organization
-   * 
+   *
    * Permanently removes a user account. This operation cannot be undone.
    * Only Admins and Accountants can perform this operation.
-   * 
+   *
    * @param userId - ID of the user to delete
    * @param organizationId - ID of the organization (multi-tenant isolation)
    * @param requesterRole - Role of the user making the request

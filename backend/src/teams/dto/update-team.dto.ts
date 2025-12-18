@@ -1,6 +1,6 @@
 /**
  * Update Team DTO
- * 
+ *
  * Data transfer object for updating an existing team.
  * All fields are optional for partial updates.
  */

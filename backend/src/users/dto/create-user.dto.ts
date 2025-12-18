@@ -1,6 +1,6 @@
 /**
  * Create User DTO
- * 
+ *
  * Data transfer object for creating a new user.
  * Includes validation for email, password strength, and role assignment.
  */
@@ -15,7 +15,8 @@ export class CreateUserDto {
   @IsString()
   @MinLength(8)
   @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, {
-    message: 'Password must contain at least one uppercase letter, one lowercase letter, and one number',
+    message:
+      'Password must contain at least one uppercase letter, one lowercase letter, and one number',
   })
   password: string;
 

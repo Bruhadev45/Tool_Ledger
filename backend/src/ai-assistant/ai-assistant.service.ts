@@ -1,10 +1,10 @@
 /**
  * AI Assistant Service
- * 
+ *
  * Provides AI-powered insights and answers questions about credentials, invoices,
  * and spending patterns. Uses OpenAI GPT models to analyze user data and provide
  * actionable recommendations. Has full access to decrypted credentials data.
- * 
+ *
  * @module AiAssistantService
  */
 
@@ -129,11 +129,11 @@ Please provide a helpful answer based on the context above. Use specific credent
 
   /**
    * Gather comprehensive data for AI analysis
-   * 
+   *
    * Collects all accessible credentials (with decryption), invoices, users,
    * analytics data, and recent activity. Credentials are decrypted so the AI
    * has full knowledge of credential details.
-   * 
+   *
    * @param userId - ID of the user requesting insights
    * @param organizationId - ID of the organization (multi-tenant isolation)
    * @param userRole - Role of the user (determines data access)
@@ -164,13 +164,7 @@ Please provide a helpful answer based on the context above. Use specific credent
       }
     });
 
-    const [
-      invoices,
-      users,
-      dashboardData,
-      recentActivity,
-    ] = await Promise.all([
-
+    const [invoices, users, dashboardData, recentActivity] = await Promise.all([
       // Invoices
       this.prisma.invoice.findMany({
         where: {
@@ -178,8 +172,8 @@ Please provide a helpful answer based on the context above. Use specific credent
           ...(userRole === 'ACCOUNTANT'
             ? { status: 'APPROVED', uploadedBy: { role: 'ADMIN' } }
             : userRole === 'ADMIN'
-            ? {}
-            : { uploadedById: userId }),
+              ? {}
+              : { uploadedById: userId }),
         },
         include: {
           uploadedBy: {
@@ -209,8 +203,8 @@ Please provide a helpful answer based on the context above. Use specific credent
       userRole === 'ADMIN'
         ? this.analyticsService.getAdminDashboard(organizationId)
         : userRole === 'ACCOUNTANT'
-        ? this.analyticsService.getAccountantDashboard(organizationId)
-        : this.analyticsService.getUserDashboard(userId, organizationId),
+          ? this.analyticsService.getAccountantDashboard(organizationId)
+          : this.analyticsService.getUserDashboard(userId, organizationId),
 
       // Recent audit logs (for admin)
       userRole === 'ADMIN'
@@ -235,11 +229,11 @@ Please provide a helpful answer based on the context above. Use specific credent
 
   /**
    * Format data for AI context
-   * 
+   *
    * Creates a comprehensive text context from all gathered data, including
    * detailed credential information (names, usernames, tags, notes) so the AI
    * can answer specific questions about credentials.
-   * 
+   *
    * @param data - Gathered data object
    * @param userRole - Role of the user
    * @returns Formatted context string for AI
@@ -251,7 +245,7 @@ Please provide a helpful answer based on the context above. Use specific credent
 
     // Credentials - Full Details
     context += `## Credentials (${credentials.length} total)\n\n`;
-    
+
     if (credentials.length === 0) {
       context += `No credentials found.\n\n`;
     } else {
@@ -290,7 +284,7 @@ Please provide a helpful answer based on the context above. Use specific credent
         }
         context += `- Owner: ${cred.owner?.firstName || ''} ${cred.owner?.lastName || ''} (${cred.owner?.email || 'N/A'})\n`;
         context += `- Created: ${new Date(cred.createdAt).toLocaleDateString()}\n`;
-        
+
         // Share information
         if (cred.shares && cred.shares.length > 0) {
           context += `- Shared with users: ${cred.shares.map((s: any) => s.user?.email || 'N/A').join(', ')}\n`;
@@ -298,14 +292,17 @@ Please provide a helpful answer based on the context above. Use specific credent
         if (cred.teamShares && cred.teamShares.length > 0) {
           context += `- Shared with teams: ${cred.teamShares.map((ts: any) => ts.team?.name || 'N/A').join(', ')}\n`;
         }
-        
+
         // Linked invoices
         if (cred.invoiceLinks && cred.invoiceLinks.length > 0) {
-          context += `- Linked invoices: ${cred.invoiceLinks.map((il: any) => 
-            `${il.invoice?.invoiceNumber || 'N/A'} (${il.invoice?.provider || 'N/A'})`
-          ).join(', ')}\n`;
+          context += `- Linked invoices: ${cred.invoiceLinks
+            .map(
+              (il: any) =>
+                `${il.invoice?.invoiceNumber || 'N/A'} (${il.invoice?.provider || 'N/A'})`,
+            )
+            .join(', ')}\n`;
         }
-        
+
         context += `\n`;
       });
 
@@ -377,10 +374,10 @@ Please provide a helpful answer based on the context above. Use specific credent
 
   /**
    * Generate AI-powered insights
-   * 
+   *
    * Uses OpenAI to analyze credentials, invoices, and spending patterns.
    * AI has full access to decrypted credential data for comprehensive analysis.
-   * 
+   *
    * @param data - Gathered data object (with decrypted credentials)
    * @param userRole - Role of the user
    * @returns AI-generated insights, recommendations, summary, and key metrics
@@ -413,7 +410,8 @@ Format your response as JSON:
         messages: [
           {
             role: 'system',
-            content: 'You are a financial and IT operations analyst. Provide clear, actionable insights and recommendations.',
+            content:
+              'You are a financial and IT operations analyst. Provide clear, actionable insights and recommendations.',
           },
           {
             role: 'user',
@@ -452,10 +450,10 @@ Format your response as JSON:
 
   /**
    * Generate basic insights without AI
-   * 
+   *
    * Fallback method when OpenAI is not available. Provides basic statistics
    * and recommendations based on credential and invoice data.
-   * 
+   *
    * @param data - Gathered data object
    * @param userRole - Role of the user
    * @returns Basic insights, recommendations, summary, and key metrics

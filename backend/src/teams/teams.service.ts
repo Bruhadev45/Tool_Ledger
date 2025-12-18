@@ -1,14 +1,19 @@
 /**
  * Teams Service
- * 
+ *
  * Handles team management within organizations. Teams are sub-organizations
  * used for grouping users and enabling team-based credential sharing.
  * Only Admins and Accountants can create/manage teams.
- * 
+ *
  * @module TeamsService
  */
 
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UserRole } from '@prisma/client';
 
@@ -18,10 +23,10 @@ export class TeamsService {
 
   /**
    * Get all teams in an organization
-   * 
+   *
    * Returns list of teams with member counts. Used for team selection
    * in credential sharing and user management.
-   * 
+   *
    * @param organizationId - ID of the organization (multi-tenant isolation)
    * @returns Array of team objects with member counts
    */
@@ -39,10 +44,10 @@ export class TeamsService {
 
   /**
    * Get a single team by ID
-   * 
+   *
    * Returns team details including all members. Enforces multi-tenant
    * isolation by verifying team belongs to organization.
-   * 
+   *
    * @param id - Team ID
    * @param organizationId - ID of the organization (multi-tenant isolation)
    * @returns Team object with members and member count
@@ -77,10 +82,10 @@ export class TeamsService {
 
   /**
    * Create a new team
-   * 
+   *
    * Creates a team within an organization. Team names must be unique
    * within the organization. Only Admins and Accountants can create teams.
-   * 
+   *
    * @param organizationId - ID of the organization
    * @param name - Team name (must be unique within organization)
    * @param description - Optional team description
@@ -89,9 +94,18 @@ export class TeamsService {
    * @throws ForbiddenException if requester is not Admin or Accountant
    * @throws BadRequestException if team name already exists
    */
-  async create(organizationId: string, name: string, description?: string, requesterRole?: UserRole) {
+  async create(
+    organizationId: string,
+    name: string,
+    description?: string,
+    requesterRole?: UserRole,
+  ) {
     // Role-based access control: Only Admins and Accountants can create teams
-    if (requesterRole && requesterRole !== UserRole.ADMIN && requesterRole !== UserRole.ACCOUNTANT) {
+    if (
+      requesterRole &&
+      requesterRole !== UserRole.ADMIN &&
+      requesterRole !== UserRole.ACCOUNTANT
+    ) {
       throw new ForbiddenException('Only admins and accountants can create teams');
     }
 
@@ -124,9 +138,19 @@ export class TeamsService {
     });
   }
 
-  async update(id: string, organizationId: string, name?: string, description?: string, requesterRole?: UserRole) {
+  async update(
+    id: string,
+    organizationId: string,
+    name?: string,
+    description?: string,
+    requesterRole?: UserRole,
+  ) {
     // Only admins and accountants can update teams
-    if (requesterRole && requesterRole !== UserRole.ADMIN && requesterRole !== UserRole.ACCOUNTANT) {
+    if (
+      requesterRole &&
+      requesterRole !== UserRole.ADMIN &&
+      requesterRole !== UserRole.ACCOUNTANT
+    ) {
       throw new ForbiddenException('Only admins and accountants can update teams');
     }
 
@@ -170,7 +194,11 @@ export class TeamsService {
 
   async remove(id: string, organizationId: string, requesterRole?: UserRole) {
     // Only admins and accountants can delete teams
-    if (requesterRole && requesterRole !== UserRole.ADMIN && requesterRole !== UserRole.ACCOUNTANT) {
+    if (
+      requesterRole &&
+      requesterRole !== UserRole.ADMIN &&
+      requesterRole !== UserRole.ACCOUNTANT
+    ) {
       throw new ForbiddenException('Only admins and accountants can delete teams');
     }
 
@@ -198,7 +226,11 @@ export class TeamsService {
 
   async addUser(teamId: string, userId: string, organizationId: string, requesterRole?: UserRole) {
     // Only admins and accountants can add users to teams
-    if (requesterRole && requesterRole !== UserRole.ADMIN && requesterRole !== UserRole.ACCOUNTANT) {
+    if (
+      requesterRole &&
+      requesterRole !== UserRole.ADMIN &&
+      requesterRole !== UserRole.ACCOUNTANT
+    ) {
       throw new ForbiddenException('Only admins and accountants can add users to teams');
     }
 
@@ -232,9 +264,18 @@ export class TeamsService {
     });
   }
 
-  async removeUser(teamId: string, userId: string, organizationId: string, requesterRole?: UserRole) {
+  async removeUser(
+    teamId: string,
+    userId: string,
+    organizationId: string,
+    requesterRole?: UserRole,
+  ) {
     // Only admins and accountants can remove users from teams
-    if (requesterRole && requesterRole !== UserRole.ADMIN && requesterRole !== UserRole.ACCOUNTANT) {
+    if (
+      requesterRole &&
+      requesterRole !== UserRole.ADMIN &&
+      requesterRole !== UserRole.ACCOUNTANT
+    ) {
       throw new ForbiddenException('Only admins and accountants can remove users from teams');
     }
 

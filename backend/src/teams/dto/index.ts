@@ -1,6 +1,6 @@
 /**
  * Teams DTOs
- * 
+ *
  * Centralized export for all team-related data transfer objects.
  */
 

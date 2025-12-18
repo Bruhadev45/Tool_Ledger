@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Param, Patch, Delete, Body, UseGuards, BadRequestException } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Param,
+  Patch,
+  Delete,
+  Body,
+  UseGuards,
+  BadRequestException,
+} from '@nestjs/common';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../shared/guards/jwt-auth.guard';
 import { RolesGuard } from '../shared/guards/roles.guard';
@@ -31,18 +41,22 @@ export class UsersController {
   @Roles(UserRole.ADMIN, UserRole.ACCOUNTANT)
   create(
     @CurrentUser() user: any,
-    @Body() body: { email: string; password: string; firstName: string; lastName: string; role: UserRole; teamId?: string },
+    @Body()
+    body: {
+      email: string;
+      password: string;
+      firstName: string;
+      lastName: string;
+      role: UserRole;
+      teamId?: string;
+    },
   ) {
     return this.usersService.create(user.organizationId, body, user.role);
   }
 
   @Patch(':id/role')
   @Roles(UserRole.ADMIN, UserRole.ACCOUNTANT)
-  updateRole(
-    @Param('id') id: string,
-    @CurrentUser() user: any,
-    @Body() body: { role: UserRole },
-  ) {
+  updateRole(@Param('id') id: string, @CurrentUser() user: any, @Body() body: { role: UserRole }) {
     return this.usersService.updateRole(id, user.organizationId, body.role, user.role);
   }
 

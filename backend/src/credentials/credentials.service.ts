@@ -1,10 +1,10 @@
 /**
  * Credentials Service
- * 
+ *
  * Handles credential management including creation, encryption, sharing, and access control.
  * All sensitive data (passwords, API keys, notes) is encrypted using AES-256 before storage.
  * Supports user-based and team-based sharing with permission levels.
- * 
+ *
  * @module CredentialsService
  */
 
@@ -28,10 +28,10 @@ export class CredentialsService {
 
   /**
    * Create a new credential
-   * 
+   *
    * Encrypts all sensitive fields (username, password, API key, notes) using AES-256
    * before storing in database. Credentials are scoped to organization for multi-tenant isolation.
-   * 
+   *
    * @param userId - ID of the user creating the credential (becomes owner)
    * @param organizationId - ID of the organization (multi-tenant isolation)
    * @param createDto - Credential data (name, username, password, optional API key, notes, tags)
@@ -44,9 +44,7 @@ export class CredentialsService {
     const encryptedApiKey = createDto.apiKey
       ? this.encryptionService.encrypt(createDto.apiKey)
       : null;
-    const encryptedNotes = createDto.notes
-      ? this.encryptionService.encrypt(createDto.notes)
-      : null;
+    const encryptedNotes = createDto.notes ? this.encryptionService.encrypt(createDto.notes) : null;
 
     return this.prisma.credential.create({
       data: {
@@ -64,13 +62,13 @@ export class CredentialsService {
 
   /**
    * Get all credentials accessible to the user
-   * 
+   *
    * Returns credentials based on role-based access control:
    * - Admins: All credentials in the organization
    * - Users: Own credentials + credentials shared with them (user-based + team-based)
-   * 
+   *
    * Includes related data: owner, shares, team shares, and linked invoices.
-   * 
+   *
    * @param userId - ID of the user requesting credentials
    * @param organizationId - ID of the organization (multi-tenant isolation)
    * @param userRole - Role of the user (determines access level)
@@ -374,9 +372,7 @@ export class CredentialsService {
         : null;
     }
     if (updateDto.notes !== undefined) {
-      updateData.notes = updateDto.notes
-        ? this.encryptionService.encrypt(updateDto.notes)
-        : null;
+      updateData.notes = updateDto.notes ? this.encryptionService.encrypt(updateDto.notes) : null;
     }
     if (updateDto.tags) updateData.tags = updateDto.tags;
 
@@ -402,7 +398,13 @@ export class CredentialsService {
     });
   }
 
-  async share(id: string, userId: string, organizationId: string, userRole: UserRole, shareDto: ShareCredentialDto) {
+  async share(
+    id: string,
+    userId: string,
+    organizationId: string,
+    userRole: UserRole,
+    shareDto: ShareCredentialDto,
+  ) {
     const credential = await this.findOne(id, userId, organizationId, userRole, false);
 
     // Only owner or admin can share

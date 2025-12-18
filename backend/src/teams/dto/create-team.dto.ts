@@ -1,6 +1,6 @@
 /**
  * Create Team DTO
- * 
+ *
  * Data transfer object for creating a new team.
  * Used for request validation and type safety.
  */

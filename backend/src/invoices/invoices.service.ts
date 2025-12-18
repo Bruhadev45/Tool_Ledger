@@ -1,10 +1,10 @@
 /**
  * Invoices Service
- * 
+ *
  * Handles invoice management including creation, file upload, approval workflow,
  * and linking to credentials. Supports multi-tenant isolation and role-based access.
  * All invoices are stored in USD currency.
- * 
+ *
  * @module InvoicesService
  */
 
@@ -28,11 +28,11 @@ export class InvoicesService {
 
   /**
    * Create a new invoice
-   * 
+   *
    * Creates an invoice with optional PDF file upload. Validates amount, dates,
    * and handles file storage. Supports linking to credentials for tracking
    * which credentials are associated with billing.
-   * 
+   *
    * @param userId - ID of the user creating the invoice
    * @param organizationId - ID of the organization (multi-tenant isolation)
    * @param createDto - Invoice data (number, amount, provider, dates, category, credential IDs)
@@ -58,7 +58,7 @@ export class InvoicesService {
           file,
           `invoices/${organizationId}`, // Organize by organization ID
         );
-        
+
         fileUrl = uploadResult.url;
         fileName = file.originalname;
         fileSize = file.size;
@@ -66,16 +66,17 @@ export class InvoicesService {
         // Re-throw the error so the invoice creation fails if file upload fails
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         throw new BadRequestException(
-          `Failed to upload file "${file.originalname}": ${errorMessage}. Please try again or contact support.`
+          `Failed to upload file "${file.originalname}": ${errorMessage}. Please try again or contact support.`,
         );
       }
     }
 
     // Validate and normalize amount (must be positive number)
-    const amount = typeof createDto.amount === 'number' 
-      ? createDto.amount 
-      : parseFloat(String(createDto.amount));
-    
+    const amount =
+      typeof createDto.amount === 'number'
+        ? createDto.amount
+        : parseFloat(String(createDto.amount));
+
     if (isNaN(amount) || !isFinite(amount) || amount <= 0) {
       throw new BadRequestException('Amount must be a valid number greater than 0');
     }
@@ -319,12 +320,7 @@ export class InvoicesService {
     });
   }
 
-  async reject(
-    id: string,
-    userId: string,
-    organizationId: string,
-    rejectionReason: string,
-  ) {
+  async reject(id: string, userId: string, organizationId: string, rejectionReason: string) {
     const invoice = await this.prisma.invoice.findFirst({
       where: {
         id,
@@ -371,11 +367,11 @@ export class InvoicesService {
     // Only uploader or admin can update, and only if pending
     const isUploader = invoice.uploadedById === userId;
     const isAdmin = userRole === UserRole.ADMIN;
-    
+
     if (!isUploader && !isAdmin) {
       throw new ForbiddenException('You do not have permission to update this invoice');
     }
-    
+
     if (invoice.status !== InvoiceStatus.PENDING) {
       throw new BadRequestException('You can only update pending invoices');
     }
