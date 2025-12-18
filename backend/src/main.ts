@@ -42,8 +42,10 @@ async function bootstrap() {
 
   // CORS configuration: Allow requests from frontend origin
   // Fixed for Railway deployment: uses FRONTEND_URL env var and PORT from Railway
-  const frontendUrl = configService.get('FRONTEND_URL');
-  const port = process.env.PORT || 8080;
+  // For local development, allow localhost:3000 if FRONTEND_URL is not set
+  const frontendUrl = configService.get('FRONTEND_URL') || 'http://localhost:3000';
+  // Use PORT from env (Railway sets this), or ConfigService, or default to 3001 for local dev
+  const port = process.env.PORT || configService.get('PORT') || 3001;
   
   app.enableCors({
     origin: frontendUrl,
