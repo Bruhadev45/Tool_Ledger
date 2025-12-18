@@ -11,83 +11,83 @@ jobs:
     name: Lint
     runs-on: ubuntu-latest
     continue-on-error: true
+
     steps:
       - uses: actions/checkout@v3
+
       - uses: actions/setup-node@v3
         with:
-          node-version: '18'
-      
+          node-version: 18
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+
       - name: Install backend dependencies
-        run: |
-          cd backend
-          npm ci
-      
+        working-directory: backend
+        run: npm ci
+
       - name: Generate Prisma Client
-        run: |
-          cd backend
-          npx prisma generate
+        working-directory: backend
+        run: npx prisma generate
         env:
           DATABASE_URL: postgresql://test:test@localhost:5432/test
-      
+
       - name: Lint backend
-        run: |
-          cd backend
-          npm run lint || exit 0
-        continue-on-error: true
+        working-directory: backend
+        run: npm run lint || exit 0
         env:
           DATABASE_URL: postgresql://test:test@localhost:5432/test
-      
+
       - name: Install frontend dependencies
-        run: |
-          cd frontend
-          npm ci
-      
+        working-directory: frontend
+        run: npm ci
+
       - name: Lint frontend
-        run: |
-          cd frontend
-          npm run lint -- --max-warnings=0 || exit 0
-        continue-on-error: true
+        working-directory: frontend
+        run: npm run lint || exit 0
 
   build:
     name: Build
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v3
+
       - uses: actions/setup-node@v3
         with:
-          node-version: '18'
-      
+          node-version: 18
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+
       - name: Install backend dependencies
-        run: |
-          cd backend
-          npm ci
-      
+        working-directory: backend
+        run: npm ci
+
       - name: Generate Prisma Client
-        run: |
-          cd backend
-          npx prisma generate
+        working-directory: backend
+        run: npx prisma generate
         env:
           DATABASE_URL: postgresql://test:test@localhost:5432/test
-      
+
       - name: Build backend
-        run: |
-          cd backend
-          npm run build
+        working-directory: backend
+        run: npm run build
         env:
           DATABASE_URL: postgresql://test:test@localhost:5432/test
           JWT_SECRET: test-secret-key-for-ci-build-only-min-32-chars
           JWT_REFRESH_SECRET: test-refresh-secret-key-for-ci-build-only-min-32-chars
           ENCRYPTION_KEY: test-encryption-key-exactly-32-bytes-long
-      
+
       - name: Install frontend dependencies
-        run: |
-          cd frontend
-          npm ci
-      
+        working-directory: frontend
+        run: npm ci
+
       - name: Build frontend
-        run: |
-          cd frontend
-          npm run build
+        working-directory: frontend
+        run: npm run build
         env:
           NEXT_PUBLIC_API_URL: http://localhost:3001/api
           NEXTAUTH_URL: http://localhost:3000
