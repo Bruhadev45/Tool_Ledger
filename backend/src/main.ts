@@ -9,7 +9,7 @@
  */
 
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe, BadRequestException } from '@nestjs/common';
+import { ValidationPipe, BadRequestException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
@@ -103,10 +103,11 @@ async function bootstrap() {
   // Railway provides PORT env var, default to 8080 if not set
   await app.listen(port);
 
-  // Log server startup information (console.log is acceptable for startup logs)
-  console.log(`🚀 Server running on port ${port}`);
-  console.log(`📡 API Base URL: /api`);
-  console.log(`🌐 CORS Allowed Origin: ${frontendUrl || 'Not configured'}`);
+  // Log server startup information
+  const logger = new Logger('Bootstrap');
+  logger.log(`🚀 Server running on port ${port}`);
+  logger.log(`📡 API Base URL: /api`);
+  logger.log(`🌐 CORS Allowed Origin: ${frontendUrl || 'Not configured'}`);
 }
 
 // Start the application
