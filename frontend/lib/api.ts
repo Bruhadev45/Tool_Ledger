@@ -11,7 +11,10 @@ import axios from 'axios';
 import { getSession } from 'next-auth/react';
 
 // API base URL from environment variable or default to localhost
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
+// IMPORTANT: Backend has global prefix '/api', so baseURL should NOT include /api
+// If NEXT_PUBLIC_API_URL includes /api, use it as-is. Otherwise, append /api
+const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API_URL = rawApiUrl.endsWith('/api') ? rawApiUrl : `${rawApiUrl}/api`;
 
 // Create axios instance with base URL
 const api = axios.create({
