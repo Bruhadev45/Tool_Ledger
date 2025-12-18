@@ -3,9 +3,10 @@
 import { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import api from '@/lib/api';
-import { Building2, Users, FileText, Key, ArrowUp, ArrowDown, X, Plus, Edit2, Trash2 } from 'lucide-react';
+import { Building2, Users, FileText, Key, ArrowUp, ArrowDown, X, Plus, Edit2, Trash2, Eye, ExternalLink } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { formatDate } from '@/lib/utils';
+import { formatDate, formatCurrency } from '@/lib/utils';
+import Link from 'next/link';
 
 export default function OrganizationsPage() {
   const { data: session } = useSession();
@@ -129,16 +130,26 @@ export default function OrganizationsPage() {
 
   const loadOrganizationDetails = async (orgId: string) => {
     try {
+      // Get all data and filter by organization
       const [usersRes, credentialsRes, invoicesRes] = await Promise.all([
-        api.get(`/users?organizationId=${orgId}`),
-        api.get(`/credentials?organizationId=${orgId}`),
-        api.get(`/invoices?organizationId=${orgId}`),
+        api.get('/users'),
+        api.get('/credentials'),
+        api.get('/invoices'),
       ]);
 
+      // Filter by organization ID
+      const orgUsers = (usersRes.data || []).filter((user: any) => user.organizationId === orgId);
+      const orgCredentials = (credentialsRes.data || []).filter(
+        (cred: any) => cred.organizationId === orgId,
+      );
+      const orgInvoices = (invoicesRes.data || []).filter(
+        (invoice: any) => invoice.organizationId === orgId,
+      );
+
       setOrgDetails({
-        users: usersRes.data || [],
-        credentials: credentialsRes.data || [],
-        invoices: invoicesRes.data || [],
+        users: orgUsers,
+        credentials: orgCredentials,
+        invoices: orgInvoices,
       });
     } catch (error: any) {
       console.error('Error loading organization details:', error);
@@ -372,39 +383,166 @@ export default function OrganizationsPage() {
 
               {/* Credentials Section */}
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <Key className="h-5 w-5" />
-                  Credentials ({orgDetails.credentials.length})
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {orgDetails.credentials.map((cred: any) => (
-                    <div key={cred.id} className="p-3 bg-gray-50 rounded-lg">
-                      <p className="text-sm font-medium text-gray-900">{cred.name}</p>
-                      <p className="text-xs text-gray-500">Owner: {cred.owner?.email}</p>
-                    </div>
-                  ))}
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                    <Key className="h-5 w-5" />
+                    Credentials ({orgDetails.credentials.length})
+                  </h3>
+                  <Link
+                    href="/credentials/new"
+                    className="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors"
+                  >
+                    <Plus className="h-3 w-3 mr-1" />
+                    Add Credential
+                  </Link>
                 </div>
+                {orgDetails.credentials.length === 0 ? (
+                  <div className="text-center py-8 bg-gray-50 rounded-lg">
+                    <Key className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+                    <p className="text-sm text-gray-500">No credentials found for this organization</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {orgDetails.credentials.map((cred: any) => (
+                      <Link
+                        key={cred.id}
+                        href={`/credentials/${cred.id}`}
+                        className="p-4 bg-gray-50 rounded-lg hover:bg-blue-50 border border-gray-200 hover:border-blue-300 transition-all group"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Key className="h-4 w-4 text-blue-600 flex-shrink-0" />
+                              <p className="text-sm font-medium text-gray-900 truncate group-hover:text-blue-600">
+                                {cred.name}
+                              </p>
+                            </div>
+                            <p className="text-xs text-gray-500 mb-2">
+                              Owner: {cred.owner?.firstName} {cred.owner?.lastName}
+                            </p>
+                            {cred.tags && cred.tags.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mb-2">
+                                {cred.tags.slice(0, 3).map((tag: string) => (
+                                  <span
+                                    key={tag}
+                                    className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800"
+                                  >
+                                    {tag}
+                                  </span>
+                                ))}
+                                {cred.tags.length > 3 && (
+                                  <span className="text-xs text-gray-500">+{cred.tags.length - 3}</span>
+                                )}
+                              </div>
+                            )}
+                            <div className="flex items-center gap-2 mt-2">
+                              {cred.isPaid !== undefined && (
+                                <span
+                                  className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                                    cred.isPaid
+                                      ? 'bg-yellow-100 text-yellow-800'
+                                      : 'bg-green-100 text-green-800'
+                                  }`}
+                                >
+                                  {cred.isPaid ? 'Paid' : 'Free'}
+                                </span>
+                              )}
+                              {cred.hasAutopay && (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800">
+                                  Autopay
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <Eye className="h-4 w-4 text-gray-400 group-hover:text-blue-600 flex-shrink-0 ml-2" />
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Invoices Section */}
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <FileText className="h-5 w-5" />
-                  Invoices ({orgDetails.invoices.length})
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {orgDetails.invoices.map((invoice: any) => (
-                    <div key={invoice.id} className="p-3 bg-gray-50 rounded-lg">
-                      <p className="text-sm font-medium text-gray-900">
-                        {invoice.invoiceNumber || 'N/A'}
-                      </p>
-                      <p className="text-xs text-gray-500">{invoice.provider}</p>
-                      <p className="text-xs font-medium text-gray-900 mt-1">
-                        ${invoice.amount?.toFixed(2) || '0.00'}
-                      </p>
-                    </div>
-                  ))}
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                    <FileText className="h-5 w-5" />
+                    Invoices ({orgDetails.invoices.length})
+                  </h3>
+                  <Link
+                    href="/invoices/new"
+                    className="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors"
+                  >
+                    <Plus className="h-3 w-3 mr-1" />
+                    Add Invoice
+                  </Link>
                 </div>
+                {orgDetails.invoices.length === 0 ? (
+                  <div className="text-center py-8 bg-gray-50 rounded-lg">
+                    <FileText className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+                    <p className="text-sm text-gray-500">No invoices found for this organization</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {orgDetails.invoices.map((invoice: any) => {
+                      const getStatusColor = (status: string) => {
+                        switch (status) {
+                          case 'APPROVED':
+                            return 'bg-blue-100 text-blue-800';
+                          case 'PENDING':
+                            return 'bg-blue-50 text-blue-700';
+                          case 'REJECTED':
+                            return 'bg-gray-100 text-gray-600';
+                          default:
+                            return 'bg-gray-100 text-gray-800';
+                        }
+                      };
+
+                      return (
+                        <Link
+                          key={invoice.id}
+                          href={`/invoices/${invoice.id}`}
+                          className="p-4 bg-gray-50 rounded-lg hover:bg-blue-50 border border-gray-200 hover:border-blue-300 transition-all group"
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-2">
+                                <FileText className="h-4 w-4 text-blue-600 flex-shrink-0" />
+                                <p className="text-sm font-medium text-gray-900 truncate group-hover:text-blue-600">
+                                  {invoice.invoiceNumber || 'N/A'}
+                                </p>
+                              </div>
+                              <p className="text-xs text-gray-500 mb-2">{invoice.provider}</p>
+                              <div className="flex items-center gap-2 mb-2">
+                                <p className="text-sm font-semibold text-gray-900">
+                                  {formatCurrency(invoice.amount || 0)}
+                                </p>
+                                {invoice.billingDate && (
+                                  <p className="text-xs text-gray-500">
+                                    • {formatDate(invoice.billingDate)}
+                                  </p>
+                                )}
+                              </div>
+                              {invoice.category && (
+                                <p className="text-xs text-gray-500 mb-2">Category: {invoice.category}</p>
+                              )}
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getStatusColor(
+                                    invoice.status || 'PENDING',
+                                  )}`}
+                                >
+                                  {invoice.status || 'PENDING'}
+                                </span>
+                              </div>
+                            </div>
+                            <Eye className="h-4 w-4 text-gray-400 group-hover:text-blue-600 flex-shrink-0 ml-2" />
+                          </div>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
           </div>
