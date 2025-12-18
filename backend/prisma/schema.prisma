@@ -1,0 +1,316 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+generator seed {
+  provider = "ts-node prisma/seed.ts"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+  ACCOUNTANT
+}
+
+enum CredentialPermission {
+  VIEW_ONLY
+  EDIT
+  NO_ACCESS
+}
+
+enum InvoiceStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum AuditAction {
+  CREATE
+  READ
+  UPDATE
+  DELETE
+  SHARE
+  REVOKE_ACCESS
+  APPROVE
+  REJECT
+  UPLOAD
+  DOWNLOAD
+}
+
+// Organizations (Multi-tenant root)
+model Organization {
+  id        String   @id @default(uuid())
+  name      String
+  domain    String   @unique // e.g., "acme.com"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users       User[]
+  teams       Team[]
+  credentials Credential[]
+  invoices    Invoice[]
+  auditLogs   AuditLog[]
+
+  @@map("organizations")
+}
+
+// Teams (Sub-organizations like Design Team, AI Team, Finance Team)
+model Team {
+  id             String   @id @default(uuid())
+  name           String // e.g., "Design Team", "AI Team", "Finance Team"
+  description    String?
+  organizationId String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization     Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  users            User[]
+  credentialShares CredentialTeamShare[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@map("teams")
+}
+
+// Users
+model User {
+  id             String    @id @default(uuid())
+  email          String    @unique
+  passwordHash   String
+  firstName      String
+  lastName       String
+  role           UserRole  @default(USER)
+  organizationId String
+  teamId         String? // Optional team membership
+  mfaEnabled     Boolean   @default(false)
+  mfaSecret      String? // TOTP secret (encrypted)
+  mfaBackupCodes String? // JSON array of backup codes
+  isActive       Boolean   @default(true)
+  lastLoginAt    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  team         Team?        @relation(fields: [teamId], references: [id], onDelete: SetNull)
+
+  ownedCredentials  Credential[]      @relation("CredentialOwner")
+  sharedCredentials CredentialShare[]
+  uploadedInvoices  Invoice[]
+  approvedInvoices  Invoice[]         @relation("InvoiceApprover")
+  comments          Comment[]
+  notifications     Notification[]
+  auditLogs         AuditLog[]
+
+  refreshTokens RefreshToken[]
+
+  @@index([organizationId, email])
+  @@index([organizationId, role])
+  @@index([teamId])
+  @@map("users")
+}
+
+// Refresh Tokens
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+// Credentials
+model Credential {
+  id             String   @id @default(uuid())
+  name           String
+  username       String // Encrypted
+  password       String // Encrypted (AES-256)
+  apiKey         String? // Encrypted
+  notes          String? // Encrypted
+  tags           String[] // Array of tags
+  organizationId String
+  ownerId        String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  owner        User         @relation("CredentialOwner", fields: [ownerId], references: [id])
+
+  shares       CredentialShare[]
+  teamShares   CredentialTeamShare[]
+  comments     Comment[]
+  invoiceLinks InvoiceCredentialLink[]
+
+  @@index([organizationId])
+  @@index([ownerId])
+  @@index([organizationId, tags])
+  @@map("credentials")
+}
+
+// Credential Team Sharing (Organization/Team-based) - defined before Team model references it
+model CredentialTeamShare {
+  id           String               @id @default(uuid())
+  credentialId String
+  teamId       String
+  permission   CredentialPermission @default(VIEW_ONLY)
+  sharedAt     DateTime             @default(now())
+  revokedAt    DateTime?
+
+  credential Credential @relation(fields: [credentialId], references: [id], onDelete: Cascade)
+  team       Team       @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([credentialId, teamId])
+  @@index([teamId])
+  @@index([credentialId])
+  @@map("credential_team_shares")
+}
+
+// Credential Sharing (User-based)
+model CredentialShare {
+  id           String               @id @default(uuid())
+  credentialId String
+  userId       String
+  permission   CredentialPermission @default(VIEW_ONLY)
+  sharedAt     DateTime             @default(now())
+  revokedAt    DateTime?
+
+  credential Credential @relation(fields: [credentialId], references: [id], onDelete: Cascade)
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([credentialId, userId])
+  @@index([userId])
+  @@index([credentialId])
+  @@map("credential_shares")
+}
+
+// Invoices
+model Invoice {
+  id              String        @id @default(uuid())
+  invoiceNumber   String
+  amount          Decimal       @db.Decimal(10, 2)
+  currency        String        @default("USD")
+  provider        String // Vendor name
+  billingDate     DateTime
+  dueDate         DateTime?
+  category        String?
+  status          InvoiceStatus @default(PENDING)
+  fileUrl         String? // S3/Azure Blob signed URL
+  fileName        String?
+  fileSize        Int? // bytes
+  organizationId  String
+  uploadedById    String
+  approvedById    String?
+  approvedAt      DateTime?
+  rejectedAt      DateTime?
+  rejectionReason String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  uploadedBy   User         @relation(fields: [uploadedById], references: [id])
+  approvedBy   User?        @relation("InvoiceApprover", fields: [approvedById], references: [id])
+
+  credentialLinks InvoiceCredentialLink[]
+  comments        Comment[]
+
+  @@index([organizationId])
+  @@index([organizationId, status])
+  @@index([organizationId, provider])
+  @@index([organizationId, billingDate])
+  @@index([uploadedById])
+  @@map("invoices")
+}
+
+// Link invoices to credentials
+model InvoiceCredentialLink {
+  id           String   @id @default(uuid())
+  invoiceId    String
+  credentialId String
+  createdAt    DateTime @default(now())
+
+  invoice    Invoice    @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  credential Credential @relation(fields: [credentialId], references: [id], onDelete: Cascade)
+
+  @@unique([invoiceId, credentialId])
+  @@index([invoiceId])
+  @@index([credentialId])
+  @@map("invoice_credential_links")
+}
+
+// Comments (on credentials and invoices)
+model Comment {
+  id           String   @id @default(uuid())
+  content      String
+  credentialId String?
+  invoiceId    String?
+  userId       String
+  parentId     String? // For threaded comments
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  credential Credential? @relation(fields: [credentialId], references: [id], onDelete: Cascade)
+  invoice    Invoice?    @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  parent     Comment?    @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies    Comment[]   @relation("CommentReplies")
+
+  @@index([credentialId])
+  @@index([invoiceId])
+  @@index([userId])
+  @@map("comments")
+}
+
+// Notifications
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  type      String // "access_request", "invoice_upload", "approval", etc.
+  title     String
+  message   String
+  read      Boolean  @default(false)
+  metadata  String? // JSON for additional data
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read])
+  @@index([userId, createdAt])
+  @@map("notifications")
+}
+
+// Audit Logs
+model AuditLog {
+  id             String      @id @default(uuid())
+  action         AuditAction
+  resourceType   String // "credential", "invoice", "user", etc.
+  resourceId     String // Generic resource ID (for polymorphic relation)
+  userId         String
+  organizationId String
+  ipAddress      String?
+  userAgent      String?
+  metadata       String? // JSON for additional context
+  createdAt      DateTime    @default(now())
+
+  user         User         @relation(fields: [userId], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  // Polymorphic relations - use resourceType + resourceId in application code
+  // Direct foreign keys removed to avoid constraint conflicts
+
+  @@index([organizationId, createdAt])
+  @@index([userId, createdAt])
+  @@index([resourceType, resourceId])
+  @@map("audit_logs")
+}
