@@ -31,6 +31,7 @@ export default function TeamsPage() {
     if (canManage) {
       loadAllUsers();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sortBy, sortOrder]);
 
   const loadTeams = async () => {

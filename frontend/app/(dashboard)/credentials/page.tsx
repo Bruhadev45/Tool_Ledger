@@ -21,6 +21,7 @@ export default function CredentialsPage() {
 
   useEffect(() => {
     loadCredentials();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadCredentials = async () => {
@@ -77,6 +78,7 @@ export default function CredentialsPage() {
 
   useEffect(() => {
     loadCredentials();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filterOwner, sortBy, sortOrder]);
 
   const handleDelete = async (credentialId: string) => {

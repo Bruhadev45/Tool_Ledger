@@ -31,6 +31,7 @@ export default function InvoicesPage() {
 
   useEffect(() => {
     loadInvoices();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadInvoices = async () => {
@@ -92,6 +93,7 @@ export default function InvoicesPage() {
 
   useEffect(() => {
     loadInvoices();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters.status, filters.provider, filters.startDate, filters.endDate, sortBy, sortOrder]);
 
   const handleDownload = async (invoiceId: string) => {

@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
 import { Lock, Eye, EyeOff, Users, UserCheck } from 'lucide-react';
+import Image from 'next/image';
 import type { MFASetup, SessionUser } from '@/lib/types';
 
 interface PasswordData {
@@ -57,6 +58,7 @@ export default function SettingsPage() {
   // Load teams and users info
   useEffect(() => {
     loadTeamsAndUsersInfo();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session]);
 
   const loadTeamsAndUsersInfo = async () => {
@@ -188,7 +190,7 @@ export default function SettingsPage() {
           <div>
             <h3 className="text-sm font-medium text-gray-700 mb-2">Change Password</h3>
             <p className="text-sm text-gray-500 mb-4">
-              Update your account password. Make sure it's strong and unique.
+              Update your account password. Make sure it&apos;s strong and unique.
             </p>
             
             {!showPasswordChange ? (
@@ -378,7 +380,7 @@ export default function SettingsPage() {
                       <p className="text-sm text-gray-700 mb-2">
                         Scan this QR code with your authenticator app (Google Authenticator, Authy, etc.):
                       </p>
-                      <img src={mfaSetup.qrCodeUrl} alt="MFA QR Code" className="w-48 h-48 border border-gray-200 rounded-lg" />
+                      <Image src={mfaSetup.qrCodeUrl} alt="MFA QR Code" width={192} height={192} className="border border-gray-200 rounded-lg" />
                     </div>
                     <div>
                       <p className="text-sm text-gray-700 mb-2">Or enter this secret manually:</p>

@@ -28,6 +28,7 @@ export default function InvoiceDetailPage() {
     if (invoiceId) {
       loadInvoice();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [invoiceId]);
 
   const loadInvoice = async () => {

@@ -34,6 +34,7 @@ export default function CredentialDetailPage() {
     if (credentialId) {
       loadCredential();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [credentialId]);
 
   useEffect(() => {
@@ -41,6 +42,7 @@ export default function CredentialDetailPage() {
       loadUsers();
       loadTeams();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showShareModal, canShare]);
 
   const loadTeams = async () => {
