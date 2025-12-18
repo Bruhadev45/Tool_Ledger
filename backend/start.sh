@@ -17,4 +17,26 @@ else
 fi
 
 echo "🎯 Starting application..."
-exec npm run start:prod
+
+# Check if dist directory exists
+if [ ! -d "dist" ]; then
+  echo "❌ ERROR: dist directory not found. Build may have failed."
+  exit 1
+fi
+
+# Find main.js file (NestJS builds to dist/main.js)
+MAIN_FILE="dist/main.js"
+if [ ! -f "$MAIN_FILE" ]; then
+  # Try alternative location
+  if [ -f "dist/src/main.js" ]; then
+    MAIN_FILE="dist/src/main.js"
+  else
+    echo "⚠️  WARNING: main.js not found in expected locations. Listing dist contents:"
+    find dist -name "*.js" | head -10
+    echo "❌ ERROR: Could not find main.js file"
+    exit 1
+  fi
+fi
+
+echo "✅ Found main file: $MAIN_FILE"
+exec node "$MAIN_FILE"
