@@ -156,6 +156,8 @@ ToolLedger is a comprehensive enterprise-grade platform designed to help organiz
 
 ## 🚀 Getting Started
 
+> **🚂 Railway Deployment**: For quick deployment to Railway, see [RAILWAY_DEPLOYMENT.md](./RAILWAY_DEPLOYMENT.md)
+
 ### Prerequisites
 
 - **Node.js**: 18.x or higher

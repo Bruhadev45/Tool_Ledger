@@ -67,3 +67,6 @@ uploads/
 # OS
 .DS_Store
 Thumbs.db
+
+# Railway (keep config files, ignore runtime files)
+.railway/
