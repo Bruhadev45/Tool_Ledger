@@ -22,10 +22,18 @@ jobs:
           cd backend
           npm ci
       
+      - name: Generate Prisma Client
+        run: |
+          cd backend
+          npx prisma generate
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/test
+      
       - name: Lint backend
         run: |
           cd backend
-          npm run lint || true
+          npm run lint || echo "Linting completed with warnings"
+        continue-on-error: true
       
       - name: Install frontend dependencies
         run: |
@@ -35,7 +43,8 @@ jobs:
       - name: Lint frontend
         run: |
           cd frontend
-          npm run lint || true
+          npm run lint || echo "Linting completed with warnings"
+        continue-on-error: true
 
   build:
     name: Build
@@ -52,14 +61,21 @@ jobs:
           cd backend
           npm ci
       
+      - name: Generate Prisma Client
+        run: |
+          cd backend
+          npx prisma generate
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/test
+      
       - name: Build backend
         run: |
           cd backend
           npm run build
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          JWT_SECRET: test-secret-key-for-ci-build-only
-          JWT_REFRESH_SECRET: test-refresh-secret-key-for-ci-build-only
+          DATABASE_URL: postgresql://test:test@localhost:5432/test
+          JWT_SECRET: test-secret-key-for-ci-build-only-min-32-chars
+          JWT_REFRESH_SECRET: test-refresh-secret-key-for-ci-build-only-min-32-chars
           ENCRYPTION_KEY: test-encryption-key-exactly-32-bytes-long
       
       - name: Install frontend dependencies
