@@ -46,7 +46,7 @@ jobs:
       - name: Lint frontend
         run: |
           cd frontend
-          npm run lint || exit 0
+          npm run lint -- --max-warnings=0 || exit 0
         continue-on-error: true
 
   build:
