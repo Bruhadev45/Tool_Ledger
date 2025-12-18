@@ -9,9 +9,8 @@ cmds = [
 [phases.build]
 cmds = [
   "npx prisma generate",
-  "npm run build",
-  "npx prisma migrate deploy"
+  "npm run build"
 ]
 
 [start]
-cmd = "npm run start:prod"
+cmd = "sh start.sh"
