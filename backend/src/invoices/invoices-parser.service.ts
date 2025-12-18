@@ -2,9 +2,10 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createWorker } from 'tesseract.js';
 import OpenAI from 'openai';
-// pdf-parse v2.x exports PDFParse class
-const pdfParseModule = require('pdf-parse');
-const PDFParse = pdfParseModule.PDFParse;
+// Use pdfjs-dist for Node-safe PDF text extraction (no DOM/Canvas warnings on Node.js 20+)
+// This is the recommended approach for Railway and other serverless environments
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js');
 
 @Injectable()
 export class InvoicesParserService {
@@ -52,10 +53,19 @@ export class InvoicesParserService {
             this.logger.debug(
               `Parsing PDF file: ${file.originalname}, size: ${file.buffer.length} bytes`,
             );
-            // pdf-parse v2.x: PDFParse is a class, use getText() method
-            const parser = new PDFParse({ data: file.buffer });
-            const pdfData = await parser.getText();
-            text = pdfData.text || '';
+            // Use pdfjs-dist for Node-safe PDF text extraction (no DOM/Canvas warnings)
+            // This is the recommended approach for Node.js 20+ on Railway
+            const loadingTask = pdfjsLib.getDocument({ data: file.buffer });
+            const pdf = await loadingTask.promise;
+            
+            let extractedText = '';
+            for (let i = 1; i <= pdf.numPages; i++) {
+              const page = await pdf.getPage(i);
+              const content = await page.getTextContent();
+              extractedText += content.items.map((item: any) => item.str).join(' ') + '\n';
+            }
+            
+            text = extractedText.trim();
             this.logger.debug(`Extracted ${text.length} characters from PDF`);
           }
         } catch (error) {
