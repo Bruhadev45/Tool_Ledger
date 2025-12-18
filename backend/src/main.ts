@@ -41,11 +41,14 @@ async function bootstrap() {
   app.use(compression());
 
   // CORS configuration: Allow requests from frontend origin
-  const frontendUrl = configService.get('FRONTEND_URL') || 'http://localhost:3000';
-  const port = configService.get('PORT') || 3001;
+  // Fixed for Railway deployment: uses FRONTEND_URL env var and PORT from Railway
+  const frontendUrl = configService.get('FRONTEND_URL');
+  const port = process.env.PORT || 8080;
+  
   app.enableCors({
     origin: frontendUrl,
     credentials: true, // Allow cookies and authorization headers
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
   });
 
   // Global validation pipe: Automatically validates all incoming requests
@@ -97,12 +100,13 @@ async function bootstrap() {
     );
 
   // Start the server on configured port
+  // Railway provides PORT env var, default to 8080 if not set
   await app.listen(port);
 
   // Log server startup information (console.log is acceptable for startup logs)
-  console.log(`🚀 Server running on http://localhost:${port}`);
-  console.log(`📡 API Base URL: http://localhost:${port}/api`);
-  console.log(`🌐 CORS Allowed Origin: ${frontendUrl}`);
+  console.log(`🚀 Server running on port ${port}`);
+  console.log(`📡 API Base URL: /api`);
+  console.log(`🌐 CORS Allowed Origin: ${frontendUrl || 'Not configured'}`);
 }
 
 // Start the application
