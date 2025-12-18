@@ -2,10 +2,6 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createWorker } from 'tesseract.js';
 import OpenAI from 'openai';
-// Use pdfjs-dist for Node-safe PDF text extraction (no DOM/Canvas warnings on Node.js 20+)
-// This is the recommended approach for Railway and other serverless environments
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js');
 
 @Injectable()
 export class InvoicesParserService {
@@ -55,6 +51,8 @@ export class InvoicesParserService {
             );
             // Use pdfjs-dist for Node-safe PDF text extraction (no DOM/Canvas warnings)
             // This is the recommended approach for Node.js 20+ on Railway
+            // pdfjs-dist v4.x is ESM-only, so we use dynamic import
+            const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
             const loadingTask = pdfjsLib.getDocument({ data: file.buffer });
             const pdf = await loadingTask.promise;
             
