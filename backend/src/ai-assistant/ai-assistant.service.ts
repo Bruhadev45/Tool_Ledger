@@ -157,10 +157,20 @@ Please provide a helpful answer based on the context above. Use specific credent
           apiKey: cred.apiKey ? this.encryptionService.decrypt(cred.apiKey) : null,
           notes: cred.notes ? this.encryptionService.decrypt(cred.notes) : null,
         };
-      } catch (error) {
-        this.logger.warn(`Failed to decrypt credential ${cred.id}: ${error.message}`);
+      } catch (error: any) {
+        this.logger.warn(
+          `Failed to decrypt credential ${cred.id}: ${error.message}. This usually means ENCRYPTION_KEY is different from the one used to encrypt this data. Skipping this credential for AI analysis.`,
+        );
         // Return credential without decryption if decryption fails
-        return cred;
+        // AI will skip credentials it can't decrypt
+        return {
+          ...cred,
+          username: '[Encrypted - Decryption Failed]',
+          password: '[Encrypted - Decryption Failed]',
+          apiKey: cred.apiKey ? '[Encrypted - Decryption Failed]' : null,
+          notes: cred.notes ? '[Encrypted - Decryption Failed]' : null,
+          _decryptionError: true,
+        };
       }
     });
 

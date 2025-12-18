@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
 
@@ -6,6 +6,7 @@ import * as crypto from 'crypto';
 export class EncryptionService {
   private readonly algorithm = 'aes-256-gcm';
   private readonly key: Buffer;
+  private readonly logger = new Logger(EncryptionService.name);
 
   constructor(private configService: ConfigService) {
     const encryptionKey = this.configService.get<string>('ENCRYPTION_KEY');
@@ -48,21 +49,61 @@ export class EncryptionService {
   }
 
   decrypt(encryptedData: string): string {
+    if (!encryptedData || typeof encryptedData !== 'string') {
+      this.logger.error('Decryption failed: Invalid input data');
+      throw new Error('Invalid encrypted data: data is null or not a string');
+    }
+
     const parts = encryptedData.split(':');
     if (parts.length !== 3) {
-      throw new Error('Invalid encrypted data format');
+      this.logger.error(`Decryption failed: Invalid format. Expected 3 parts, got ${parts.length}`);
+      throw new Error('Invalid encrypted data format: expected format iv:authTag:encrypted');
     }
 
     const [ivHex, authTagHex, encrypted] = parts;
-    const iv = Buffer.from(ivHex, 'hex');
-    const authTag = Buffer.from(authTagHex, 'hex');
 
-    const decipher = crypto.createDecipheriv(this.algorithm, this.key, iv);
-    decipher.setAuthTag(authTag);
+    // Validate hex strings
+    if (!/^[0-9a-f]+$/i.test(ivHex) || !/^[0-9a-f]+$/i.test(authTagHex) || !/^[0-9a-f]+$/i.test(encrypted)) {
+      this.logger.error('Decryption failed: Invalid hex format in encrypted data');
+      throw new Error('Invalid encrypted data: contains non-hexadecimal characters');
+    }
 
-    let decrypted = decipher.update(encrypted, 'hex', 'utf8');
-    decrypted += decipher.final('utf8');
+    try {
+      const iv = Buffer.from(ivHex, 'hex');
+      const authTag = Buffer.from(authTagHex, 'hex');
 
-    return decrypted;
+      // Validate buffer lengths
+      if (iv.length !== 16) {
+        this.logger.error(`Decryption failed: Invalid IV length. Expected 16 bytes, got ${iv.length}`);
+        throw new Error('Invalid encrypted data: IV must be 16 bytes');
+      }
+
+      if (authTag.length !== 16) {
+        this.logger.error(`Decryption failed: Invalid auth tag length. Expected 16 bytes, got ${authTag.length}`);
+        throw new Error('Invalid encrypted data: Auth tag must be 16 bytes');
+      }
+
+      const decipher = crypto.createDecipheriv(this.algorithm, this.key, iv);
+      decipher.setAuthTag(authTag);
+
+      let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+      decrypted += decipher.final('utf8');
+
+      return decrypted;
+    } catch (error: any) {
+      // Check if it's an authentication error (wrong key)
+      if (error.message?.includes('Unsupported state') || error.message?.includes('unable to authenticate')) {
+        this.logger.error(
+          'Decryption failed: Authentication error. This usually means the ENCRYPTION_KEY is different from the one used to encrypt the data.',
+        );
+        throw new Error(
+          'Decryption failed: Invalid encryption key. The data was encrypted with a different key. Ensure ENCRYPTION_KEY matches the key used during encryption.',
+        );
+      }
+
+      // Log other errors
+      this.logger.error(`Decryption failed: ${error.message}`, error.stack);
+      throw new Error(`Decryption failed: ${error.message}`);
+    }
   }
 }

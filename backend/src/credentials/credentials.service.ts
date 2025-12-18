@@ -13,6 +13,7 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { EncryptionService } from '../shared/encryption/encryption.service';
@@ -21,6 +22,8 @@ import { CreateCredentialDto, UpdateCredentialDto, ShareCredentialDto } from './
 
 @Injectable()
 export class CredentialsService {
+  private readonly logger = new Logger(CredentialsService.name);
+
   constructor(
     private prisma: PrismaService,
     private encryptionService: EncryptionService,
@@ -328,13 +331,30 @@ export class CredentialsService {
 
     // Decrypt if requested and user has access
     if (includeDecrypted) {
-      return {
-        ...credential,
-        username: this.encryptionService.decrypt(credential.username),
-        password: this.encryptionService.decrypt(credential.password),
-        apiKey: credential.apiKey ? this.encryptionService.decrypt(credential.apiKey) : null,
-        notes: credential.notes ? this.encryptionService.decrypt(credential.notes) : null,
-      };
+      try {
+        return {
+          ...credential,
+          username: this.encryptionService.decrypt(credential.username),
+          password: this.encryptionService.decrypt(credential.password),
+          apiKey: credential.apiKey ? this.encryptionService.decrypt(credential.apiKey) : null,
+          notes: credential.notes ? this.encryptionService.decrypt(credential.notes) : null,
+        };
+      } catch (error: any) {
+        this.logger.error(
+          `Failed to decrypt credential ${id}: ${error.message}. This usually means ENCRYPTION_KEY is different from the one used to encrypt this data.`,
+        );
+        // Return credential with encrypted fields if decryption fails
+        // This allows the API to still return the credential, but without decrypted values
+        return {
+          ...credential,
+          username: '[Decryption Error]',
+          password: '[Decryption Error]',
+          apiKey: credential.apiKey ? '[Decryption Error]' : null,
+          notes: credential.notes ? '[Decryption Error]' : null,
+          _decryptionError: true,
+          _errorMessage: 'Unable to decrypt credential. ENCRYPTION_KEY may be incorrect.',
+        };
+      }
     }
 
     return credential;
