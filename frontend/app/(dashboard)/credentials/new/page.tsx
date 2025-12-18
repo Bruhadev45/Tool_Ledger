@@ -65,6 +65,8 @@ export default function NewCredentialPage() {
       apiKey: template.apiKey,
       notes: template.notes,
       tags: template.tags,
+      isPaid: false,
+      hasAutopay: false,
     });
     setShowTemplates(false);
     toast.success('Template applied! Please fill in the credentials.');
