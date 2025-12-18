@@ -22,5 +22,6 @@ module.exports = {
     '@typescript-eslint/explicit-module-boundary-types': 'off',
     '@typescript-eslint/no-explicit-any': 'off',
     '@typescript-eslint/no-unused-vars': 'off', // Disable unused vars check for now
+    '@typescript-eslint/no-var-requires': 'off', // Allow require() for CommonJS compatibility
   },
 };
