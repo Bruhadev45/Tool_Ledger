@@ -6,12 +6,28 @@ import api from '@/lib/api';
 import UserDashboard from '@/components/dashboards/UserDashboard';
 import AdminDashboard from '@/components/dashboards/AdminDashboard';
 import AccountantDashboard from '@/components/dashboards/AccountantDashboard';
+import { User, UserCog, Shield } from 'lucide-react';
+
+type UserRole = 'USER' | 'ACCOUNTANT' | 'ADMIN';
 
 export default function DashboardPage() {
   const { data: session } = useSession();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedRole, setSelectedRole] = useState<UserRole | null>(null);
+
+  // Get actual user role from session
+  const actualRole = (session?.user as any)?.role as UserRole;
+
+  // Initialize selected role with actual role, or default to USER
+  useEffect(() => {
+    if (actualRole && !selectedRole) {
+      setSelectedRole(actualRole);
+    } else if (!selectedRole) {
+      setSelectedRole('USER');
+    }
+  }, [actualRole, selectedRole]);
 
   useEffect(() => {
     if (session) {
@@ -79,13 +95,62 @@ export default function DashboardPage() {
     );
   }
 
-  const role = (session?.user as any)?.role;
+  // Use selected role for display, or fallback to actual role
+  const displayRole = selectedRole || actualRole || 'USER';
 
-  if (role === 'ADMIN') {
-    return <AdminDashboard data={data} />;
-  } else if (role === 'ACCOUNTANT') {
-    return <AccountantDashboard data={data} />;
-  } else {
-    return <UserDashboard data={data} />;
-  }
+  // Role selector component
+  const RoleSelector = () => (
+    <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <label htmlFor="role-select" className="text-sm font-medium text-gray-700">
+            View Dashboard As:
+          </label>
+          <div className="relative">
+            <select
+              id="role-select"
+              value={displayRole}
+              onChange={(e) => setSelectedRole(e.target.value as UserRole)}
+              className="appearance-none bg-white border border-gray-300 rounded-md px-4 py-2 pr-10 text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 cursor-pointer"
+            >
+              <option value="USER">User</option>
+              <option value="ACCOUNTANT">Accountant</option>
+              <option value="ADMIN">Admin</option>
+            </select>
+            <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+              {displayRole === 'ADMIN' && <Shield className="h-4 w-4 text-blue-600" />}
+              {displayRole === 'ACCOUNTANT' && <UserCog className="h-4 w-4 text-blue-600" />}
+              {displayRole === 'USER' && <User className="h-4 w-4 text-blue-600" />}
+            </div>
+          </div>
+        </div>
+        {actualRole && displayRole !== actualRole && (
+          <div className="text-xs text-gray-500 bg-white px-3 py-1 rounded-md border border-gray-200">
+            Your actual role: <span className="font-semibold">{actualRole}</span>
+          </div>
+        )}
+      </div>
+      <p className="text-xs text-gray-600 mt-2">
+        💡 Switch between roles to view different dashboard perspectives. This only changes the view, not your actual permissions.
+      </p>
+    </div>
+  );
+
+  // Render dashboard based on selected role
+  const renderDashboard = () => {
+    if (displayRole === 'ADMIN') {
+      return <AdminDashboard data={data} />;
+    } else if (displayRole === 'ACCOUNTANT') {
+      return <AccountantDashboard data={data} />;
+    } else {
+      return <UserDashboard data={data} />;
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <RoleSelector />
+      {renderDashboard()}
+    </div>
+  );
 }
