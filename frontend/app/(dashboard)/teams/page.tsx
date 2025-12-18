@@ -322,9 +322,25 @@ export default function TeamsPage() {
                   </div>
                 )}
               </div>
-              <div className="flex items-center gap-2 text-sm text-gray-600">
-                <Users className="h-4 w-4" />
-                <span>{team._count?.users || 0} member{team._count?.users !== 1 ? 's' : ''}</span>
+              <div className="flex items-center justify-between mt-4">
+                <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <Users className="h-4 w-4" />
+                  <span>{team._count?.users || 0} member{team._count?.users !== 1 ? 's' : ''}</span>
+                </div>
+                {canManage && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openTeamDetails(team.id);
+                      setTimeout(() => setShowAddUserModal(true), 100);
+                    }}
+                    className="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors"
+                    title="Add user to team"
+                  >
+                    <UserPlus className="h-3 w-3 mr-1" />
+                    Add User
+                  </button>
+                )}
               </div>
             </div>
           ))}
@@ -350,20 +366,41 @@ export default function TeamsPage() {
               </button>
             </div>
             <div className="p-6">
+              {canManage && (
+                <div className="mb-6">
+                  <button
+                    onClick={() => setShowAddUserModal(true)}
+                    className="w-full inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                  >
+                    <UserPlus className="h-4 w-4 mr-2" />
+                    Add User to Team
+                  </button>
+                </div>
+              )}
               {teamUsers.length === 0 ? (
                 <div className="text-center py-8">
                   <Users className="mx-auto h-12 w-12 text-gray-400" />
                   <h3 className="mt-2 text-sm font-medium text-gray-900">No members</h3>
                   <p className="mt-1 text-sm text-gray-500">This team has no members yet.</p>
+                  {canManage && (
+                    <button
+                      onClick={() => setShowAddUserModal(true)}
+                      className="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 transition-colors"
+                    >
+                      <UserPlus className="h-4 w-4 mr-2" />
+                      Add First Member
+                    </button>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-3">
+                  <h3 className="text-sm font-semibold text-gray-900 mb-3">Team Members ({teamUsers.length})</h3>
                   {teamUsers.map((user: any) => (
                     <div
                       key={user.id}
-                      className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                      className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
                     >
-                      <div>
+                      <div className="flex-1">
                         <p className="text-sm font-medium text-gray-900">
                           {user.firstName} {user.lastName}
                         </p>
@@ -383,17 +420,6 @@ export default function TeamsPage() {
                       )}
                     </div>
                   ))}
-                </div>
-              )}
-              {canManage && (
-                <div className="mt-6 pt-6 border-t border-gray-200">
-                  <button
-                    onClick={() => setShowAddUserModal(true)}
-                    className="w-full inline-flex items-center justify-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 transition-colors"
-                  >
-                    <UserPlus className="h-4 w-4 mr-2" />
-                    Add Member
-                  </button>
                 </div>
               )}
             </div>
