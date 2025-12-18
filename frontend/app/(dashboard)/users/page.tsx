@@ -31,6 +31,7 @@ export default function UsersPage() {
   useEffect(() => {
     loadUsers();
     loadTeams();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sortBy, sortOrder, filterRole, filterStatus]);
 
   const loadTeams = async () => {
