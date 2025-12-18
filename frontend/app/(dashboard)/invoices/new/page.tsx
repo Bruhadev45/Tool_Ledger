@@ -44,6 +44,13 @@ export default function NewInvoicePage() {
     setFile(selectedFile);
 
     if (selectedFile) {
+      // Validate file type
+      const validTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
+      if (!validTypes.includes(selectedFile.type) && !selectedFile.name.toLowerCase().endsWith('.pdf')) {
+        toast.error('Please upload a PDF or image file');
+        return;
+      }
+
       // Auto-detect invoice details
       setParsing(true);
       try {
@@ -55,6 +62,11 @@ export default function NewInvoicePage() {
             'Content-Type': 'multipart/form-data',
           },
         });
+
+        // Check if response has error
+        if (response.data?.error) {
+          throw new Error(response.data.error);
+        }
 
         const detectedData = response.data;
 
@@ -86,6 +98,24 @@ export default function NewInvoicePage() {
               return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
             }
             
+            // If in MM/DD/YYYY format, convert to YYYY-MM-DD
+            if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(dateStr)) {
+              const parts = dateStr.split('/');
+              // Try both formats
+              try {
+                const date1 = new Date(`${parts[2]}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}`);
+                const date2 = new Date(`${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`);
+                // Use the one that makes sense (month <= 12)
+                if (parseInt(parts[0]) <= 12) {
+                  return date1.toISOString().split('T')[0];
+                } else {
+                  return date2.toISOString().split('T')[0];
+                }
+              } catch {
+                // Fallback
+              }
+            }
+            
             // Try to parse as Date and format
             try {
               const date = new Date(dateStr);
@@ -99,23 +129,60 @@ export default function NewInvoicePage() {
             return dateStr;
           };
 
+          // Update form data with detected values (only update if detected)
+          const updatedData: any = {};
+          
+          if (detectedData.invoiceNumber) {
+            updatedData.invoiceNumber = detectedData.invoiceNumber;
+          }
+          if (amountValue) {
+            updatedData.amount = amountValue;
+          }
+          if (detectedData.provider) {
+            updatedData.provider = detectedData.provider;
+          }
+          if (detectedData.billingDate) {
+            const convertedBillingDate = convertDateForInput(detectedData.billingDate);
+            if (convertedBillingDate) {
+              updatedData.billingDate = convertedBillingDate;
+            }
+          }
+          if (detectedData.dueDate) {
+            const convertedDueDate = convertDateForInput(detectedData.dueDate);
+            if (convertedDueDate) {
+              updatedData.dueDate = convertedDueDate;
+            }
+          }
+          if (detectedData.category) {
+            updatedData.category = detectedData.category;
+          }
+
+          // Update form data
           setFormData((prev) => ({
             ...prev,
-            invoiceNumber: detectedData.invoiceNumber || prev.invoiceNumber,
-            amount: amountValue || prev.amount,
+            ...updatedData,
             currency: 'USD', // Always use USD
-            provider: detectedData.provider || prev.provider,
-            billingDate: convertDateForInput(detectedData.billingDate) || prev.billingDate,
-            dueDate: convertDateForInput(detectedData.dueDate) || prev.dueDate,
-            category: detectedData.category || prev.category,
           }));
 
-          if (detectedData.invoiceNumber || detectedData.amount || detectedData.provider) {
+          // Show success message with detected fields
+          const detectedFields = Object.keys(updatedData).filter(key => updatedData[key]);
+          if (detectedFields.length > 0) {
             setAutoFilled(true);
-            toast.success('Invoice details detected! Please review and update if needed.');
+            toast.success(
+              `Invoice details detected! Found: ${detectedFields.join(', ')}. Please review and update if needed.`,
+              { duration: 5000 }
+            );
           } else {
-            toast('Could not detect invoice details. Please fill manually.', { icon: 'ℹ️' });
+            toast('Could not detect invoice details from PDF. Please fill manually.', { 
+              icon: 'ℹ️',
+              duration: 4000 
+            });
           }
+        } else {
+          toast('No data detected from invoice. Please fill manually.', { 
+            icon: 'ℹ️',
+            duration: 4000 
+          });
         }
       } catch (error: any) {
         console.error('Error parsing invoice:', error);
@@ -128,7 +195,7 @@ export default function NewInvoicePage() {
         
         let errorMessage = 'Failed to parse invoice';
         if (error.response?.status === 404) {
-          errorMessage = 'Parse endpoint not found. Please ensure the backend is running and the route is configured correctly.';
+          errorMessage = 'Parse endpoint not found. Please ensure the backend is running.';
         } else if (error.response?.status === 401) {
           errorMessage = 'Authentication required. Please log in again.';
         } else if (error.response?.data?.error) {
@@ -139,7 +206,9 @@ export default function NewInvoicePage() {
           errorMessage = error.message;
         }
         
-        toast.error(`Parsing failed: ${errorMessage}. Please fill details manually.`);
+        toast.error(`Parsing failed: ${errorMessage}. Please fill details manually.`, {
+          duration: 5000
+        });
       } finally {
         setParsing(false);
       }
