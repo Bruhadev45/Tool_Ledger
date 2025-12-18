@@ -94,5 +94,3 @@ jobs:
           NEXT_PUBLIC_API_URL: http://localhost:3001/api
           NEXTAUTH_URL: http://localhost:3000
           NEXTAUTH_SECRET: test-nextauth-secret-for-ci-build-only-min-32-chars
-          NEXTAUTH_URL: http://localhost:3000
-          NEXTAUTH_SECRET: test-nextauth-secret-for-ci-build-only-min-32-chars
