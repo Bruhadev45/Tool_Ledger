@@ -21,6 +21,12 @@ export default function OrganizationsPage() {
   const [editingOrg, setEditingOrg] = useState<any>(null);
   const [formData, setFormData] = useState({ name: '', domain: '' });
   const [submitting, setSubmitting] = useState(false);
+  const [showAddUserModal, setShowAddUserModal] = useState(false);
+  const [showAddCredentialModal, setShowAddCredentialModal] = useState(false);
+  const [availableUsers, setAvailableUsers] = useState<any[]>([]);
+  const [availableCredentials, setAvailableCredentials] = useState<any[]>([]);
+  const [selectedUserId, setSelectedUserId] = useState('');
+  const [selectedCredentialId, setSelectedCredentialId] = useState('');
 
   useEffect(() => {
     loadOrganizations();
@@ -146,6 +152,10 @@ export default function OrganizationsPage() {
         (invoice: any) => invoice.organizationId === orgId,
       );
 
+      // Store all users and credentials for adding to organization
+      setAvailableUsers(usersRes.data || []);
+      setAvailableCredentials(credentialsRes.data || []);
+
       setOrgDetails({
         users: orgUsers,
         credentials: orgCredentials,
@@ -154,6 +164,79 @@ export default function OrganizationsPage() {
     } catch (error: any) {
       console.error('Error loading organization details:', error);
       toast.error('Failed to load organization details');
+    }
+  };
+
+  const handleAddUser = async () => {
+    if (!selectedUserId || !selectedOrg) return;
+    setSubmitting(true);
+    try {
+      await api.post(`/organizations/${selectedOrg}/users/${selectedUserId}`);
+      toast.success('User added to organization successfully');
+      setShowAddUserModal(false);
+      setSelectedUserId('');
+      loadOrganizationDetails(selectedOrg);
+      loadOrganizations(); // Refresh organization stats
+    } catch (error: any) {
+      console.error('Error adding user:', error);
+      toast.error(error.response?.data?.message || 'Failed to add user to organization');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleRemoveUser = async (userId: string, userName: string) => {
+    if (!selectedOrg) return;
+    if (!confirm(`Are you sure you want to remove "${userName}" from this organization?`)) {
+      return;
+    }
+    try {
+      await api.delete(`/organizations/${selectedOrg}/users/${userId}`);
+      toast.success('User removed from organization successfully');
+      loadOrganizationDetails(selectedOrg);
+      loadOrganizations(); // Refresh organization stats
+    } catch (error: any) {
+      console.error('Error removing user:', error);
+      toast.error(error.response?.data?.message || 'Failed to remove user from organization');
+    }
+  };
+
+  const handleAddCredential = async () => {
+    if (!selectedCredentialId || !selectedOrg) return;
+    setSubmitting(true);
+    try {
+      await api.post(`/organizations/${selectedOrg}/credentials/${selectedCredentialId}`);
+      toast.success('Credential added to organization successfully');
+      setShowAddCredentialModal(false);
+      setSelectedCredentialId('');
+      loadOrganizationDetails(selectedOrg);
+      loadOrganizations(); // Refresh organization stats
+    } catch (error: any) {
+      console.error('Error adding credential:', error);
+      toast.error(error.response?.data?.message || 'Failed to add credential to organization');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleRemoveCredential = async (credentialId: string, credentialName: string) => {
+    if (!selectedOrg) return;
+    if (!confirm(`Are you sure you want to remove "${credentialName}" from this organization?`)) {
+      return;
+    }
+    try {
+      await api.delete(`/organizations/${selectedOrg}/credentials/${credentialId}`);
+      toast.success('Credential removed from organization successfully');
+      loadOrganizationDetails(selectedOrg);
+      loadOrganizations(); // Refresh organization stats
+    } catch (error: any) {
+      console.error('Error removing credential:', error);
+      const errorMsg = error.response?.data?.message || 'Failed to remove credential from organization';
+      toast.error(errorMsg);
+      // If it's the "must belong to organization" error, suggest moving instead
+      if (errorMsg.includes('must belong to an organization')) {
+        toast('Tip: Move the credential to another organization instead', { icon: 'ℹ️', duration: 5000 });
+      }
     }
   };
 
@@ -362,23 +445,59 @@ export default function OrganizationsPage() {
             <div className="p-6 space-y-6">
               {/* Users Section */}
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <Users className="h-5 w-5" />
-                  Users ({orgDetails.users.length})
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {orgDetails.users.map((user: any) => (
-                    <div key={user.id} className="p-3 bg-gray-50 rounded-lg">
-                      <p className="text-sm font-medium text-gray-900">
-                        {user.firstName} {user.lastName}
-                      </p>
-                      <p className="text-xs text-gray-500">{user.email}</p>
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 mt-1">
-                        {user.role}
-                      </span>
-                    </div>
-                  ))}
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                    <Users className="h-5 w-5" />
+                    Users ({orgDetails.users.length})
+                  </h3>
+                  <button
+                    onClick={() => {
+                      setSelectedUserId('');
+                      setShowAddUserModal(true);
+                    }}
+                    className="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors"
+                  >
+                    <Plus className="h-3 w-3 mr-1" />
+                    Add User
+                  </button>
                 </div>
+                {orgDetails.users.length === 0 ? (
+                  <div className="text-center py-8 bg-gray-50 rounded-lg">
+                    <Users className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+                    <p className="text-sm text-gray-500">No users found for this organization</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {orgDetails.users.map((user: any) => (
+                      <div
+                        key={user.id}
+                        className="p-4 bg-gray-50 rounded-lg border border-gray-200 hover:border-blue-300 transition-all"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-900">
+                              {user.firstName} {user.lastName}
+                            </p>
+                            <p className="text-xs text-gray-500 truncate">{user.email}</p>
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 mt-2">
+                              {user.role}
+                            </span>
+                          </div>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRemoveUser(user.id, `${user.firstName} ${user.lastName}`);
+                            }}
+                            className="ml-2 p-1.5 text-red-600 hover:bg-red-50 rounded-md transition-colors flex-shrink-0"
+                            title="Remove user from organization"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Credentials Section */}
@@ -388,13 +507,25 @@ export default function OrganizationsPage() {
                     <Key className="h-5 w-5" />
                     Credentials ({orgDetails.credentials.length})
                   </h3>
-                  <Link
-                    href="/credentials/new"
-                    className="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors"
-                  >
-                    <Plus className="h-3 w-3 mr-1" />
-                    Add Credential
-                  </Link>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        setSelectedCredentialId('');
+                        setShowAddCredentialModal(true);
+                      }}
+                      className="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors"
+                    >
+                      <Plus className="h-3 w-3 mr-1" />
+                      Add Existing
+                    </button>
+                    <Link
+                      href="/credentials/new"
+                      className="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors"
+                    >
+                      <Plus className="h-3 w-3 mr-1" />
+                      Create New
+                    </Link>
+                  </div>
                 </div>
                 {orgDetails.credentials.length === 0 ? (
                   <div className="text-center py-8 bg-gray-50 rounded-lg">
@@ -404,13 +535,15 @@ export default function OrganizationsPage() {
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {orgDetails.credentials.map((cred: any) => (
-                      <Link
+                      <div
                         key={cred.id}
-                        href={`/credentials/${cred.id}`}
-                        className="p-4 bg-gray-50 rounded-lg hover:bg-blue-50 border border-gray-200 hover:border-blue-300 transition-all group"
+                        className="p-4 bg-gray-50 rounded-lg border border-gray-200 hover:border-blue-300 transition-all group"
                       >
                         <div className="flex items-start justify-between">
-                          <div className="flex-1 min-w-0">
+                          <Link
+                            href={`/credentials/${cred.id}`}
+                            className="flex-1 min-w-0"
+                          >
                             <div className="flex items-center gap-2 mb-2">
                               <Key className="h-4 w-4 text-blue-600 flex-shrink-0" />
                               <p className="text-sm font-medium text-gray-900 truncate group-hover:text-blue-600">
@@ -453,10 +586,28 @@ export default function OrganizationsPage() {
                                 </span>
                               )}
                             </div>
+                          </Link>
+                          <div className="flex items-center gap-1 ml-2">
+                            <Link
+                              href={`/credentials/${cred.id}`}
+                              className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors flex-shrink-0"
+                              title="View credential"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Link>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleRemoveCredential(cred.id, cred.name);
+                              }}
+                              className="p-1.5 text-red-600 hover:bg-red-50 rounded-md transition-colors flex-shrink-0"
+                              title="Remove credential from organization"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
                           </div>
-                          <Eye className="h-4 w-4 text-gray-400 group-hover:text-blue-600 flex-shrink-0 ml-2" />
                         </div>
-                      </Link>
+                      </div>
                     ))}
                   </div>
                 )}
@@ -687,6 +838,134 @@ export default function OrganizationsPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Add User Modal */}
+      {showAddUserModal && selectedOrg && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+              <h2 className="text-xl font-semibold text-gray-900">Add User to Organization</h2>
+              <button
+                onClick={() => {
+                  setShowAddUserModal(false);
+                  setSelectedUserId('');
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="p-6">
+              <div className="mb-4">
+                <label htmlFor="user-select" className="block text-sm font-medium text-gray-700 mb-2">
+                  Select User <span className="text-red-500">*</span>
+                </label>
+                <select
+                  id="user-select"
+                  value={selectedUserId}
+                  onChange={(e) => setSelectedUserId(e.target.value)}
+                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                >
+                  <option value="">Choose a user...</option>
+                  {availableUsers
+                    .filter((user: any) => user.organizationId !== selectedOrg)
+                    .map((user: any) => (
+                      <option key={user.id} value={user.id}>
+                        {user.firstName} {user.lastName} ({user.email}) - Current Org: {organizations.find((o: any) => o.id === user.organizationId)?.name || 'None'}
+                      </option>
+                    ))}
+                </select>
+                {availableUsers.filter((user: any) => user.organizationId !== selectedOrg).length === 0 && (
+                  <p className="mt-2 text-xs text-gray-500">All users are already in this organization</p>
+                )}
+              </div>
+              <div className="flex items-center justify-end gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAddUserModal(false);
+                    setSelectedUserId('');
+                  }}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleAddUser}
+                  disabled={submitting || !selectedUserId}
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {submitting ? 'Adding...' : 'Add User'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Credential Modal */}
+      {showAddCredentialModal && selectedOrg && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+              <h2 className="text-xl font-semibold text-gray-900">Add Credential to Organization</h2>
+              <button
+                onClick={() => {
+                  setShowAddCredentialModal(false);
+                  setSelectedCredentialId('');
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="p-6">
+              <div className="mb-4">
+                <label htmlFor="credential-select" className="block text-sm font-medium text-gray-700 mb-2">
+                  Select Credential <span className="text-red-500">*</span>
+                </label>
+                <select
+                  id="credential-select"
+                  value={selectedCredentialId}
+                  onChange={(e) => setSelectedCredentialId(e.target.value)}
+                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                >
+                  <option value="">Choose a credential...</option>
+                  {availableCredentials
+                    .filter((cred: any) => cred.organizationId !== selectedOrg)
+                    .map((cred: any) => (
+                      <option key={cred.id} value={cred.id}>
+                        {cred.name} - Current Org: {organizations.find((o: any) => o.id === cred.organizationId)?.name || 'None'}
+                      </option>
+                    ))}
+                </select>
+                {availableCredentials.filter((cred: any) => cred.organizationId !== selectedOrg).length === 0 && (
+                  <p className="mt-2 text-xs text-gray-500">All credentials are already in this organization</p>
+                )}
+              </div>
+              <div className="flex items-center justify-end gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAddCredentialModal(false);
+                    setSelectedCredentialId('');
+                  }}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleAddCredential}
+                  disabled={submitting || !selectedCredentialId}
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {submitting ? 'Adding...' : 'Add Credential'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

@@ -67,4 +67,36 @@ export class OrganizationsController {
     await this.organizationsService.remove(id);
     return { message: 'Organization deleted successfully' };
   }
+
+  @Post(':id/users/:userId')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN)
+  async addUser(@Param('id') orgId: string, @Param('userId') userId: string) {
+    return this.organizationsService.addUser(orgId, userId);
+  }
+
+  @Delete(':id/users/:userId')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async removeUser(@Param('id') orgId: string, @Param('userId') userId: string) {
+    await this.organizationsService.removeUser(orgId, userId);
+    return { message: 'User removed from organization successfully' };
+  }
+
+  @Post(':id/credentials/:credentialId')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN)
+  async addCredential(@Param('id') orgId: string, @Param('credentialId') credentialId: string) {
+    return this.organizationsService.addCredential(orgId, credentialId);
+  }
+
+  @Delete(':id/credentials/:credentialId')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async removeCredential(@Param('id') orgId: string, @Param('credentialId') credentialId: string) {
+    await this.organizationsService.removeCredential(orgId, credentialId);
+    return { message: 'Credential removed from organization successfully' };
+  }
 }

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateOrganizationDto } from './dto/create-organization.dto';
 import { UpdateOrganizationDto } from './dto/update-organization.dto';
@@ -100,5 +100,173 @@ export class OrganizationsService {
     await this.prisma.organization.delete({
       where: { id },
     });
+  }
+
+  async addUser(orgId: string, userId: string) {
+    // Verify organization exists
+    await this.findOne(orgId);
+
+    // Verify user exists
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, firstName: true, lastName: true, organizationId: true },
+    });
+
+    if (!user) {
+      throw new NotFoundException(`User with ID ${userId} not found`);
+    }
+
+    // Update user's organization
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: { organizationId: orgId },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        isActive: true,
+        organizationId: true,
+      },
+    });
+  }
+
+  async removeUser(orgId: string, userId: string) {
+    // Verify organization exists
+    await this.findOne(orgId);
+
+    // Verify user exists and belongs to this organization
+    const user = await this.prisma.user.findFirst({
+      where: { id: userId, organizationId: orgId },
+    });
+
+    if (!user) {
+      throw new NotFoundException(`User with ID ${userId} not found in this organization`);
+    }
+
+    // Find a default organization or create one for orphaned users
+    // First, try to find any other organization
+    const otherOrg = await this.prisma.organization.findFirst({
+      where: { id: { not: orgId } },
+    });
+
+    if (otherOrg) {
+      // Move user to another organization
+      return this.prisma.user.update({
+        where: { id: userId },
+        data: { organizationId: otherOrg.id },
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          role: true,
+          organizationId: true,
+        },
+      });
+    } else {
+      // No other organization exists, create a default one
+      const defaultOrg = await this.prisma.organization.create({
+        data: {
+          name: 'Default Organization',
+          domain: 'default.local',
+        },
+      });
+
+      return this.prisma.user.update({
+        where: { id: userId },
+        data: { organizationId: defaultOrg.id },
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          role: true,
+          organizationId: true,
+        },
+      });
+    }
+  }
+
+  async addCredential(orgId: string, credentialId: string) {
+    // Verify organization exists
+    await this.findOne(orgId);
+
+    // Verify credential exists
+    const credential = await this.prisma.credential.findUnique({
+      where: { id: credentialId },
+      select: { id: true, name: true, organizationId: true },
+    });
+
+    if (!credential) {
+      throw new NotFoundException(`Credential with ID ${credentialId} not found`);
+    }
+
+    // Update credential's organization
+    return this.prisma.credential.update({
+      where: { id: credentialId },
+      data: { organizationId: orgId },
+      select: {
+        id: true,
+        name: true,
+        organizationId: true,
+        ownerId: true,
+        createdAt: true,
+      },
+    });
+  }
+
+  async removeCredential(orgId: string, credentialId: string) {
+    // Verify organization exists
+    await this.findOne(orgId);
+
+    // Verify credential exists and belongs to this organization
+    const credential = await this.prisma.credential.findFirst({
+      where: { id: credentialId, organizationId: orgId },
+    });
+
+    if (!credential) {
+      throw new NotFoundException(`Credential with ID ${credentialId} not found in this organization`);
+    }
+
+    // Find a default organization or create one for orphaned credentials
+    // First, try to find any other organization
+    const otherOrg = await this.prisma.organization.findFirst({
+      where: { id: { not: orgId } },
+    });
+
+    if (otherOrg) {
+      // Move credential to another organization
+      return this.prisma.credential.update({
+        where: { id: credentialId },
+        data: { organizationId: otherOrg.id },
+        select: {
+          id: true,
+          name: true,
+          organizationId: true,
+          ownerId: true,
+        },
+      });
+    } else {
+      // No other organization exists, create a default one
+      const defaultOrg = await this.prisma.organization.create({
+        data: {
+          name: 'Default Organization',
+          domain: 'default.local',
+        },
+      });
+
+      return this.prisma.credential.update({
+        where: { id: credentialId },
+        data: { organizationId: defaultOrg.id },
+        select: {
+          id: true,
+          name: true,
+          organizationId: true,
+          ownerId: true,
+        },
+      });
+    }
   }
 }
