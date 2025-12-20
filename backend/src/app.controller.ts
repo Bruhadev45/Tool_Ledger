@@ -1,7 +1,20 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Logger } from '@nestjs/common';
 
+/**
+ * Root Application Controller
+ *
+ * Provides health check and API information endpoints.
+ * These endpoints are public and don't require authentication.
+ */
 @Controller()
 export class AppController {
+  private readonly logger = new Logger(AppController.name);
+
+  /**
+   * Get API information
+   *
+   * Returns basic API metadata and available endpoint paths.
+   */
   @Get()
   getRoot() {
     return {
@@ -17,9 +30,15 @@ export class AppController {
     };
   }
 
+  /**
+   * Health check endpoint
+   *
+   * Used by deployment platforms (Railway) to verify the service is running.
+   * Returns current status and timestamp.
+   */
   @Get('health')
   getHealth() {
-    console.log('Healthcheck endpoint hit');
+    this.logger.log('Health check endpoint hit');
     return {
       status: 'ok',
       timestamp: new Date().toISOString(),
