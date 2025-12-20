@@ -15,9 +15,10 @@ export default function DashboardLayout({
   const router = useRouter();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  // Periodic session refresh for real-time data sync (every 2 minutes)
+  // Silent session refresh for real-time data sync (only on focus)
   const refreshSession = useCallback(async () => {
     try {
+      // Silently update session without causing page refresh
       await update();
     } catch (error) {
       console.warn('Session refresh failed:', error);
@@ -30,18 +31,12 @@ export default function DashboardLayout({
     }
   }, [status, router]);
 
-  // Auto-refresh session every 2 minutes for real-time role/data sync
-  useEffect(() => {
-    if (status === 'authenticated') {
-      const interval = setInterval(refreshSession, 2 * 60 * 1000); // 2 minutes
-      return () => clearInterval(interval);
-    }
-  }, [status, refreshSession]);
-
-  // Refresh session when window gains focus (user switches back to tab)
+  // Refresh session only when window gains focus (user switches back to tab)
+  // This is less intrusive than periodic refresh and still keeps data in sync
   useEffect(() => {
     const handleFocus = () => {
       if (status === 'authenticated') {
+        // Silent refresh when user returns to tab
         refreshSession();
       }
     };
