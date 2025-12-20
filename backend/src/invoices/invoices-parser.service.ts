@@ -52,7 +52,10 @@ export class InvoicesParserService {
             // Use pdfjs-dist for Node-safe PDF text extraction (no DOM/Canvas warnings)
             // This is the recommended approach for Node.js 20+ on Railway
             // pdfjs-dist v4.x is ESM-only, so we use dynamic import
-            const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
+            // Use Function constructor to preserve dynamic import syntax (prevents TypeScript from converting to require)
+            // This ensures the dynamic import is executed at runtime, not transformed by TypeScript compiler
+            const importPdfjs = new Function('specifier', 'return import(specifier)');
+            const pdfjsLib = await importPdfjs('pdfjs-dist/legacy/build/pdf.mjs');
             const loadingTask = pdfjsLib.getDocument({
               data: new Uint8Array(file.buffer),
               verbosity: 0, // Suppress warnings
