@@ -77,21 +77,34 @@ async function bootstrap() {
     }),
   );
 
-    // Set global API prefix: All routes will be prefixed with /api
-    app.setGlobalPrefix('api');
+  // Add root healthcheck route BEFORE setting global prefix (for Railway healthcheck)
+  // This ensures Railway can check / and get a 200 OK response
+  app.getHttpAdapter().get('/', (req, res) => {
+    res.status(200).json({
+      status: 'ok',
+      message: 'ToolLedger API',
+      timestamp: new Date().toISOString(),
+    });
+  });
 
-    // Start the server on configured port
-    // Ensure port is a number
-    const numericPort = typeof port === 'string' ? parseInt(port, 10) : port;
-    await app.listen(numericPort, '0.0.0.0');
-    console.log(`🚀 Server actually listening on 0.0.0.0:${numericPort}`);
+  // Set global API prefix: All routes will be prefixed with /api
+  app.setGlobalPrefix('api');
 
+  // Start the server on configured port
+  // Railway provides PORT env var, ensure we use it
+  const numericPort = typeof port === 'string' ? parseInt(port, 10) : port;
+  if (isNaN(numericPort)) {
+    throw new Error(`Invalid port: ${port}`);
+  }
+
+  await app.listen(numericPort, '0.0.0.0');
 
   // Log server startup information
   const logger = new Logger('Bootstrap');
-  logger.log(`🚀 Server running on port ${port}`);
+  logger.log(`🚀 Server running on port ${numericPort}`);
   logger.log(`📡 API Base URL: /api`);
   logger.log(`🌐 CORS Allowed Origin: ${frontendUrl || 'Not configured'}`);
+  logger.log(`✅ Healthcheck available at: / and /api/health`);
 }
 
 // Start the application
