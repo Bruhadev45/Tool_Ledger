@@ -4,8 +4,8 @@
 
 ### 1. ✅ Node Version Mismatch (FIXED)
 **Problem:** Build was using Node v18.20.5, but project requires Node >=20
-**Error:** `EBADENGINE Unsupported engine` for multiple packages
-**Solution:** Updated `backend/nixpacks.toml` from `nodejs-18_x` to `nodejs-20_x`
+**Error:** `EBADENGINE Unsupported engine` or `undefined variable 'nodejs-20_x'`
+**Solution:** Updated `nixpacks.toml` to use `nodejs_20` package name.
 
 ### 2. ⚠️ Package Lock File Sync Issue
 **Problem:** `chokidar@3.6.0` missing from lock file
