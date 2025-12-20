@@ -236,8 +236,11 @@ export default function OrganizationsPage() {
     try {
       await api.delete(`/organizations/${selectedOrg}/credentials/${credentialId}`);
       toast.success('Credential removed from organization successfully');
-      loadOrganizationDetails(selectedOrg);
-      loadOrganizations(); // Refresh organization stats
+      // Refresh both organization details and the main list
+      await Promise.all([
+        loadOrganizationDetails(selectedOrg),
+        loadOrganizations(), // Refresh organization stats
+      ]);
     } catch (error: any) {
       console.error('Error removing credential:', error);
       const errorMsg = error.response?.data?.message || 'Failed to remove credential from organization';
