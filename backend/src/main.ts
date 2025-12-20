@@ -77,22 +77,14 @@ async function bootstrap() {
     }),
   );
 
-  // Set global API prefix: All routes will be prefixed with /api
-  app.setGlobalPrefix('api');
-
-    // Root endpoint: Provides API information and available endpoints
-    app.getHttpAdapter().get('/', (req: any, res: any) => {
-      console.log('Root healthcheck hit');
-      res.status(200).json({
-        message: 'ToolLedger API',
-        version: '2.0.0',
-        status: 'ok'
-      });
-    });
+    // Set global API prefix: All routes will be prefixed with /api
+    app.setGlobalPrefix('api');
 
     // Start the server on configured port
-    await app.listen(port, '0.0.0.0');
-    console.log(`🚀 Server actually listening on 0.0.0.0:${port}`);
+    // Ensure port is a number
+    const numericPort = typeof port === 'string' ? parseInt(port, 10) : port;
+    await app.listen(numericPort, '0.0.0.0');
+    console.log(`🚀 Server actually listening on 0.0.0.0:${numericPort}`);
 
 
   // Log server startup information
