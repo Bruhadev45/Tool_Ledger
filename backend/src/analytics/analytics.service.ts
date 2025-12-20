@@ -52,7 +52,11 @@ export class AnalyticsService {
     };
   }
 
-  async getAdminDashboard(organizationId: string) {
+  async getAdminDashboard(organizationId: string, isGlobalAdmin = true) {
+    // For global admins, show data across ALL organizations
+    // For org-specific admins, filter by organizationId
+    const whereOrg = isGlobalAdmin ? {} : { organizationId };
+    
     const [
       credentialCount,
       totalSpend,
@@ -63,16 +67,19 @@ export class AnalyticsService {
       approvedInvoices,
       rejectedInvoices,
       monthlySpend,
+      totalUsers,
+      totalTeams,
+      totalOrganizations,
     ] = await Promise.all([
-      // Total credentials
+      // Total credentials (all orgs for global admin)
       this.prisma.credential.count({
-        where: { organizationId },
+        where: whereOrg,
       }),
 
-      // Total spend
+      // Total spend (all orgs for global admin)
       this.prisma.invoice.aggregate({
         where: {
-          organizationId,
+          ...whereOrg,
           status: InvoiceStatus.APPROVED,
         },
         _sum: {
@@ -80,11 +87,11 @@ export class AnalyticsService {
         },
       }),
 
-      // Spend by user
+      // Spend by user (all orgs for global admin)
       this.prisma.invoice.groupBy({
         by: ['uploadedById'],
         where: {
-          organizationId,
+          ...whereOrg,
           status: InvoiceStatus.APPROVED,
         },
         _sum: {
@@ -96,7 +103,7 @@ export class AnalyticsService {
       this.prisma.invoice.groupBy({
         by: ['category'],
         where: {
-          organizationId,
+          ...whereOrg,
           status: InvoiceStatus.APPROVED,
           category: { not: null },
         },
@@ -105,11 +112,11 @@ export class AnalyticsService {
         },
       }),
 
-      // Vendor-wise spend
+      // Vendor-wise spend (all orgs for global admin)
       this.prisma.invoice.groupBy({
         by: ['provider'],
         where: {
-          organizationId,
+          ...whereOrg,
           status: InvoiceStatus.APPROVED,
         },
         _sum: {
@@ -117,32 +124,45 @@ export class AnalyticsService {
         },
       }),
 
-      // Pending invoices
+      // Pending invoices (all orgs for global admin)
       this.prisma.invoice.count({
         where: {
-          organizationId,
+          ...whereOrg,
           status: InvoiceStatus.PENDING,
         },
       }),
 
-      // Approved invoices
+      // Approved invoices (all orgs for global admin)
       this.prisma.invoice.count({
         where: {
-          organizationId,
+          ...whereOrg,
           status: InvoiceStatus.APPROVED,
         },
       }),
 
-      // Rejected invoices
+      // Rejected invoices (all orgs for global admin)
       this.prisma.invoice.count({
         where: {
-          organizationId,
+          ...whereOrg,
           status: InvoiceStatus.REJECTED,
         },
       }),
 
-      // Monthly spend
-      this.getMonthlySpend(organizationId),
+      // Monthly spend (all orgs for global admin)
+      this.getMonthlySpend(isGlobalAdmin ? undefined : organizationId),
+      
+      // Total users (all orgs for global admin)
+      this.prisma.user.count({
+        where: whereOrg,
+      }),
+      
+      // Total teams (all orgs for global admin)
+      this.prisma.team.count({
+        where: whereOrg,
+      }),
+      
+      // Total organizations (only for global admin)
+      isGlobalAdmin ? this.prisma.organization.count() : Promise.resolve(1),
     ]);
 
     return {
@@ -155,6 +175,10 @@ export class AnalyticsService {
       approvedInvoices,
       rejectedInvoices,
       monthlySpend,
+      totalUsers,
+      totalTeams,
+      totalOrganizations,
+      isGlobalAdmin,
     };
   }
 
@@ -207,11 +231,15 @@ export class AnalyticsService {
     };
   }
 
-  private async getMonthlySpend(organizationId: string, userId?: string) {
+  private async getMonthlySpend(organizationId?: string, userId?: string) {
     const where: any = {
-      organizationId,
       status: InvoiceStatus.APPROVED,
     };
+
+    // Only filter by organizationId if provided (for non-global admins)
+    if (organizationId) {
+      where.organizationId = organizationId;
+    }
 
     if (userId) {
       where.uploadedById = userId;
