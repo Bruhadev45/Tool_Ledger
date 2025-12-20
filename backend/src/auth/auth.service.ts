@@ -14,7 +14,7 @@ import * as bcrypt from 'bcrypt';
 import * as speakeasy from 'speakeasy';
 import * as QRCode from 'qrcode';
 import { PrismaService } from '../prisma/prisma.service';
-import { UserRole } from '@prisma/client';
+import { UserRole, UserApprovalStatus } from '@prisma/client';
 
 @Injectable()
 export class AuthService {
@@ -47,6 +47,15 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    // Check if user registration is approved
+    if (user.approvalStatus !== UserApprovalStatus.APPROVED) {
+      if (user.approvalStatus === UserApprovalStatus.PENDING_APPROVAL) {
+        throw new UnauthorizedException('Your account is pending admin approval. Please contact your administrator.');
+      } else if (user.approvalStatus === UserApprovalStatus.REJECTED) {
+        throw new UnauthorizedException('Your registration has been rejected. Please contact your administrator.');
+      }
+    }
+
     const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
     if (!isPasswordValid) {
       throw new UnauthorizedException('Invalid credentials');
@@ -61,9 +70,12 @@ export class AuthService {
    *
    * Creates access token (short-lived) and refresh token (long-lived) for the user.
    * Access token contains user identity and role information.
+   * 
+   * IMPORTANT: For ADMIN users, MFA is mandatory. If MFA is not enabled, login will fail.
    *
    * @param user - Authenticated user object
    * @returns Object containing access_token, refresh_token, and user data
+   * @throws UnauthorizedException if admin user doesn't have MFA enabled
    */
   async login(user: {
     id: string;
@@ -74,6 +86,13 @@ export class AuthService {
     organizationId: string;
     mfaEnabled: boolean;
   }) {
+    // MFA is mandatory for ADMIN users
+    if (user.role === UserRole.ADMIN && !user.mfaEnabled) {
+      throw new UnauthorizedException(
+        'Multi-factor authentication (MFA) is required for admin accounts. Please enable MFA in your account settings before logging in.',
+      );
+    }
+
     // Create JWT payload with user information
     const payload = {
       email: user.email,
@@ -151,7 +170,10 @@ export class AuthService {
     // Hash password using bcrypt with salt rounds of 10
     const passwordHash = await bcrypt.hash(password, 10);
 
-    // Create new user account
+    // Create new user account with PENDING_APPROVAL status
+    // Admins and Accountants are auto-approved, regular users need approval
+    const autoApprove = role === UserRole.ADMIN || role === UserRole.ACCOUNTANT;
+    
     const user = await this.prisma.user.create({
       data: {
         email,
@@ -160,9 +182,34 @@ export class AuthService {
         lastName,
         role,
         organizationId: organization.id,
+        approvalStatus: autoApprove ? UserApprovalStatus.APPROVED : UserApprovalStatus.PENDING_APPROVAL,
       },
       include: { organization: true },
     });
+
+    // If user needs approval, notify admins
+    if (!autoApprove) {
+      // Find all admins in the organization to notify them
+      const admins = await this.prisma.user.findMany({
+        where: {
+          organizationId: organization.id,
+          role: UserRole.ADMIN,
+          isActive: true,
+        },
+      });
+
+      // Create notifications for admins
+      await this.prisma.notification.createMany({
+        data: admins.map((admin) => ({
+          userId: admin.id,
+          type: 'user_registration',
+          title: 'New User Registration',
+          message: `${user.firstName} ${user.lastName} (${user.email}) has requested access. Please review and approve.`,
+          read: false,
+          metadata: JSON.stringify({ userId: user.id, email: user.email }),
+        })),
+      });
+    }
 
     // Remove password hash from response for security
     const { passwordHash: _, ...userWithoutPassword } = user;

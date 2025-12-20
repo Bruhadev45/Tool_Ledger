@@ -1,4 +1,4 @@
-import { PrismaClient, UserRole, InvoiceStatus, CredentialPermission, AuditAction } from '@prisma/client';
+import { PrismaClient, UserRole, InvoiceStatus, CredentialPermission, AuditAction, UserApprovalStatus } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 
@@ -79,8 +79,9 @@ async function main() {
       lastName: 'Hero',
       role: UserRole.ADMIN,
       organizationId: organization.id,
-      mfaEnabled: false,
+      mfaEnabled: false, // Note: MFA will be required at login, but seed data doesn't enforce it
       isActive: true,
+      approvalStatus: UserApprovalStatus.APPROVED, // Admins are auto-approved
     },
   });
 
@@ -98,6 +99,7 @@ async function main() {
       role: UserRole.USER,
       organizationId: organization.id,
       isActive: true,
+      approvalStatus: UserApprovalStatus.APPROVED, // Seed users are pre-approved
     },
   });
 
@@ -112,6 +114,7 @@ async function main() {
       role: UserRole.USER,
       organizationId: organization.id,
       isActive: true,
+      approvalStatus: UserApprovalStatus.APPROVED, // Seed users are pre-approved
     },
   });
 
@@ -126,6 +129,7 @@ async function main() {
       role: UserRole.USER,
       organizationId: organization.id,
       isActive: true,
+      approvalStatus: UserApprovalStatus.APPROVED, // Seed users are pre-approved
     },
   });
 
@@ -143,6 +147,7 @@ async function main() {
       role: UserRole.ACCOUNTANT,
       organizationId: organization.id,
       isActive: true,
+      approvalStatus: UserApprovalStatus.APPROVED, // Accountants are auto-approved
     },
   });
 
@@ -157,6 +162,7 @@ async function main() {
       role: UserRole.ACCOUNTANT,
       organizationId: organization.id,
       isActive: true,
+      approvalStatus: UserApprovalStatus.APPROVED, // Accountants are auto-approved
     },
   });
 

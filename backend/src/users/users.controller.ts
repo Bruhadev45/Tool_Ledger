@@ -79,4 +79,28 @@ export class UsersController {
     }
     return this.usersService.remove(id, user.organizationId, user.role);
   }
+
+  @Post(':id/approve')
+  @Roles(UserRole.ADMIN)
+  approveUser(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.usersService.approveUser(id, user.organizationId, user.role);
+  }
+
+  @Post(':id/reject')
+  @Roles(UserRole.ADMIN)
+  rejectUser(@Param('id') id: string, @CurrentUser() user: any, @Body() body: { reason?: string }) {
+    return this.usersService.rejectUser(id, user.organizationId, user.role, body.reason);
+  }
+
+  @Post(':id/assign/:adminId')
+  @Roles(UserRole.ADMIN)
+  assignUserToAdmin(@Param('id') userId: string, @Param('adminId') adminId: string, @CurrentUser() user: any) {
+    return this.usersService.assignUserToAdmin(userId, adminId, user.organizationId, user.role);
+  }
+
+  @Post(':id/unassign')
+  @Roles(UserRole.ADMIN)
+  unassignUserFromAdmin(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.usersService.unassignUserFromAdmin(id, user.organizationId, user.role);
+  }
 }

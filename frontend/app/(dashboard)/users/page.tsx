@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useSession } from 'next-auth/react';
 import api from '@/lib/api';
-import { Users, Shield, User, Mail, Edit, Check, X, Plus, Trash2, ArrowUp, ArrowDown, Filter, Building2, RefreshCw } from 'lucide-react';
+import { Users, Shield, User, Mail, Edit, Check, X, Plus, Trash2, ArrowUp, ArrowDown, Filter, Building2, RefreshCw, CheckCircle, XCircle, UserCog } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function UsersPage() {
@@ -219,6 +219,51 @@ export default function UsersPage() {
     }
   };
 
+  const handleApprove = async (userId: string) => {
+    try {
+      await api.post(`/users/${userId}/approve`);
+      toast.success('User approved successfully');
+      await loadUsers();
+    } catch (error: any) {
+      console.error('Approve failed:', error);
+      toast.error(error.response?.data?.message || 'Failed to approve user');
+    }
+  };
+
+  const handleReject = async (userId: string, userEmail: string) => {
+    const reason = prompt(`Enter reason for rejecting ${userEmail} (optional):`);
+    try {
+      await api.post(`/users/${userId}/reject`, { reason: reason || undefined });
+      toast.success('User rejected successfully');
+      await loadUsers();
+    } catch (error: any) {
+      console.error('Reject failed:', error);
+      toast.error(error.response?.data?.message || 'Failed to reject user');
+    }
+  };
+
+  const handleAssignToAdmin = async (userId: string, adminId: string) => {
+    try {
+      await api.post(`/users/${userId}/assign/${adminId}`);
+      toast.success('User assigned to admin successfully');
+      await loadUsers();
+    } catch (error: any) {
+      console.error('Assign failed:', error);
+      toast.error(error.response?.data?.message || 'Failed to assign user to admin');
+    }
+  };
+
+  const handleUnassignFromAdmin = async (userId: string) => {
+    try {
+      await api.post(`/users/${userId}/unassign`);
+      toast.success('User unassigned from admin successfully');
+      await loadUsers();
+    } catch (error: any) {
+      console.error('Unassign failed:', error);
+      toast.error(error.response?.data?.message || 'Failed to unassign user from admin');
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -402,6 +447,35 @@ export default function UsersPage() {
                         <p className="text-xs text-gray-500">{user.organization.name}</p>
                       </div>
                     )}
+                    {user.approvalStatus && (
+                      <div className="flex items-center gap-2 mt-1">
+                        {user.approvalStatus === 'APPROVED' && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                            <CheckCircle className="h-3 w-3 mr-1" />
+                            Approved
+                          </span>
+                        )}
+                        {user.approvalStatus === 'PENDING_APPROVAL' && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">
+                            Pending Approval
+                          </span>
+                        )}
+                        {user.approvalStatus === 'REJECTED' && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
+                            <XCircle className="h-3 w-3 mr-1" />
+                            Rejected
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    {user.assignedAdmin && (session?.user as any)?.role === 'ADMIN' && (
+                      <div className="flex items-center gap-2 mt-1">
+                        <UserCog className="h-3 w-3 text-gray-400" />
+                        <p className="text-xs text-gray-500">
+                          Assigned to: {user.assignedAdmin.firstName} {user.assignedAdmin.lastName}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
@@ -449,6 +523,24 @@ export default function UsersPage() {
                           <span className="text-gray-500">Inactive</span>
                         )}
                       </div>
+                      {(session?.user as any)?.role === 'ADMIN' && user.approvalStatus === 'PENDING_APPROVAL' && (
+                        <>
+                          <button
+                            onClick={() => handleApprove(user.id)}
+                            className="text-green-600 hover:text-green-700 p-1 rounded-md hover:bg-green-50 transition-colors"
+                            title="Approve user"
+                          >
+                            <CheckCircle className="h-5 w-5" />
+                          </button>
+                          <button
+                            onClick={() => handleReject(user.id, user.email)}
+                            className="text-red-600 hover:text-red-700 p-1 rounded-md hover:bg-red-50 transition-colors"
+                            title="Reject user"
+                          >
+                            <XCircle className="h-5 w-5" />
+                          </button>
+                        </>
+                      )}
                       <button
                         onClick={() => handleEdit(user)}
                         className="text-blue-600 hover:text-blue-700 p-1 rounded-md hover:bg-blue-50 transition-colors"

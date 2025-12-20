@@ -16,6 +16,12 @@ enum UserRole {
   ACCOUNTANT
 }
 
+enum UserApprovalStatus {
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+}
+
 enum CredentialPermission {
   VIEW_ONLY
   EDIT
@@ -86,6 +92,8 @@ model User {
   role           UserRole  @default(USER)
   organizationId String
   teamId         String? // Optional team membership
+  assignedAdminId String? // Admin assigned to manage this user (for admin-user hierarchy)
+  approvalStatus UserApprovalStatus @default(PENDING_APPROVAL) // Registration approval status
   mfaEnabled     Boolean   @default(false)
   mfaSecret      String? // TOTP secret (encrypted)
   mfaBackupCodes String? // JSON array of backup codes
@@ -96,6 +104,8 @@ model User {
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   team         Team?        @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  assignedAdmin User?       @relation("AdminUserHierarchy", fields: [assignedAdminId], references: [id], onDelete: SetNull)
+  managedUsers  User[]      @relation("AdminUserHierarchy") // Users assigned to this admin
 
   ownedCredentials  Credential[]      @relation("CredentialOwner")
   sharedCredentials CredentialShare[]
@@ -110,6 +120,8 @@ model User {
   @@index([organizationId, email])
   @@index([organizationId, role])
   @@index([teamId])
+  @@index([assignedAdminId])
+  @@index([approvalStatus])
   @@map("users")
 }
 

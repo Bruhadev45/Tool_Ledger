@@ -15,7 +15,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { UserRole } from '@prisma/client';
+import { UserRole, UserApprovalStatus } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
@@ -52,6 +52,8 @@ export class UsersService {
         lastName: true,
         role: true,
         isActive: true,
+        approvalStatus: true,
+        assignedAdminId: true,
         createdAt: true,
         lastLoginAt: true,
         organizationId: true, // Include organizationId so frontend can show which org
@@ -66,6 +68,14 @@ export class UsersService {
           select: {
             id: true,
             name: true,
+          },
+        },
+        assignedAdmin: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
           },
         },
       },
@@ -126,6 +136,9 @@ export class UsersService {
     }
 
     // Create new user account
+    // Admins and Accountants are auto-approved, regular users need approval
+    const autoApprove = data.role === UserRole.ADMIN || data.role === UserRole.ACCOUNTANT;
+    
     const user = await this.prisma.user.create({
       data: {
         email: data.email,
@@ -136,6 +149,7 @@ export class UsersService {
         organizationId,
         teamId: data.teamId || null,
         isActive: true, // New users are active by default
+        approvalStatus: autoApprove ? UserApprovalStatus.APPROVED : UserApprovalStatus.PENDING_APPROVAL,
       },
       select: {
         id: true,
@@ -144,6 +158,7 @@ export class UsersService {
         lastName: true,
         role: true,
         isActive: true,
+        approvalStatus: true,
         createdAt: true,
         team: {
           select: {
@@ -153,6 +168,28 @@ export class UsersService {
         },
       },
     });
+
+    // If user needs approval, notify admins
+    if (!autoApprove) {
+      const admins = await this.prisma.user.findMany({
+        where: {
+          organizationId,
+          role: UserRole.ADMIN,
+          isActive: true,
+        },
+      });
+
+      await this.prisma.notification.createMany({
+        data: admins.map((admin) => ({
+          userId: admin.id,
+          type: 'user_registration',
+          title: 'New User Registration',
+          message: `${user.firstName} ${user.lastName} (${user.email}) has been created and requires approval.`,
+          read: false,
+          metadata: JSON.stringify({ userId: user.id, email: user.email }),
+        })),
+      });
+    }
 
     return user;
   }
@@ -354,5 +391,266 @@ export class UsersService {
     });
 
     return { message: 'User deleted successfully' };
+  }
+
+  /**
+   * Approve a user registration
+   *
+   * Changes user's approval status from PENDING_APPROVAL to APPROVED.
+   * Only Admins can perform this operation.
+   *
+   * @param userId - ID of the user to approve
+   * @param organizationId - ID of the organization (multi-tenant isolation)
+   * @param requesterRole - Role of the user making the request
+   * @returns Updated user object
+   * @throws ForbiddenException if requester is not Admin
+   * @throws NotFoundException if user not found
+   */
+  async approveUser(userId: string, organizationId: string, requesterRole: UserRole) {
+    // Only Admins can approve users
+    if (requesterRole !== UserRole.ADMIN) {
+      throw new ForbiddenException('Only admins can approve user registrations');
+    }
+
+    // Verify user exists
+    const user = await this.prisma.user.findFirst({
+      where: { id: userId, organizationId },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (user.approvalStatus === UserApprovalStatus.APPROVED) {
+      throw new BadRequestException('User is already approved');
+    }
+
+    // Update approval status
+    const updatedUser = await this.prisma.user.update({
+      where: { id: userId },
+      data: { approvalStatus: UserApprovalStatus.APPROVED },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        isActive: true,
+        approvalStatus: true,
+        createdAt: true,
+      },
+    });
+
+    // Create notification for the approved user
+    await this.prisma.notification.create({
+      data: {
+        userId: user.id,
+        type: 'user_approved',
+        title: 'Account Approved',
+        message: 'Your account has been approved. You can now access the platform.',
+        read: false,
+      },
+    });
+
+    return updatedUser;
+  }
+
+  /**
+   * Reject a user registration
+   *
+   * Changes user's approval status from PENDING_APPROVAL to REJECTED.
+   * Only Admins can perform this operation.
+   *
+   * @param userId - ID of the user to reject
+   * @param organizationId - ID of the organization (multi-tenant isolation)
+   * @param requesterRole - Role of the user making the request
+   * @param reason - Optional reason for rejection
+   * @returns Updated user object
+   * @throws ForbiddenException if requester is not Admin
+   * @throws NotFoundException if user not found
+   */
+  async rejectUser(
+    userId: string,
+    organizationId: string,
+    requesterRole: UserRole,
+    reason?: string,
+  ) {
+    // Only Admins can reject users
+    if (requesterRole !== UserRole.ADMIN) {
+      throw new ForbiddenException('Only admins can reject user registrations');
+    }
+
+    // Verify user exists
+    const user = await this.prisma.user.findFirst({
+      where: { id: userId, organizationId },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (user.approvalStatus === UserApprovalStatus.REJECTED) {
+      throw new BadRequestException('User is already rejected');
+    }
+
+    // Update approval status
+    const updatedUser = await this.prisma.user.update({
+      where: { id: userId },
+      data: { approvalStatus: UserApprovalStatus.REJECTED },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        isActive: true,
+        approvalStatus: true,
+        createdAt: true,
+      },
+    });
+
+    // Create notification for the rejected user
+    await this.prisma.notification.create({
+      data: {
+        userId: user.id,
+        type: 'user_rejected',
+        title: 'Registration Rejected',
+        message: reason
+          ? `Your registration has been rejected. Reason: ${reason}`
+          : 'Your registration has been rejected. Please contact your administrator for more information.',
+        read: false,
+        metadata: reason ? JSON.stringify({ reason }) : null,
+      },
+    });
+
+    return updatedUser;
+  }
+
+  /**
+   * Assign a user to an admin (admin-user hierarchy)
+   *
+   * Links a user to a specific admin for management purposes.
+   * Only Admins can perform this operation.
+   *
+   * @param userId - ID of the user to assign
+   * @param adminId - ID of the admin to assign the user to
+   * @param organizationId - ID of the organization (multi-tenant isolation)
+   * @param requesterRole - Role of the user making the request
+   * @returns Updated user object
+   * @throws ForbiddenException if requester is not Admin
+   * @throws NotFoundException if user or admin not found
+   * @throws BadRequestException if adminId is not an admin
+   */
+  async assignUserToAdmin(
+    userId: string,
+    adminId: string,
+    organizationId: string,
+    requesterRole: UserRole,
+  ) {
+    // Only Admins can assign users
+    if (requesterRole !== UserRole.ADMIN) {
+      throw new ForbiddenException('Only admins can assign users to admins');
+    }
+
+    // Verify user exists
+    const user = await this.prisma.user.findFirst({
+      where: { id: userId, organizationId },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    // Verify admin exists and is actually an admin
+    const admin = await this.prisma.user.findFirst({
+      where: { id: adminId, organizationId, role: UserRole.ADMIN },
+    });
+
+    if (!admin) {
+      throw new BadRequestException('Admin not found or is not an admin');
+    }
+
+    // Update user's assigned admin
+    const updatedUser = await this.prisma.user.update({
+      where: { id: userId },
+      data: { assignedAdminId: adminId },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        isActive: true,
+        assignedAdminId: true,
+        assignedAdmin: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+        createdAt: true,
+      },
+    });
+
+    // Create notification for the assigned user
+    await this.prisma.notification.create({
+      data: {
+        userId: user.id,
+        type: 'user_assigned',
+        title: 'Assigned to Admin',
+        message: `You have been assigned to ${admin.firstName} ${admin.lastName} for management.`,
+        read: false,
+        metadata: JSON.stringify({ adminId: admin.id }),
+      },
+    });
+
+    return updatedUser;
+  }
+
+  /**
+   * Unassign a user from an admin
+   *
+   * Removes the admin-user assignment.
+   * Only Admins can perform this operation.
+   *
+   * @param userId - ID of the user to unassign
+   * @param organizationId - ID of the organization (multi-tenant isolation)
+   * @param requesterRole - Role of the user making the request
+   * @returns Updated user object
+   * @throws ForbiddenException if requester is not Admin
+   * @throws NotFoundException if user not found
+   */
+  async unassignUserFromAdmin(userId: string, organizationId: string, requesterRole: UserRole) {
+    // Only Admins can unassign users
+    if (requesterRole !== UserRole.ADMIN) {
+      throw new ForbiddenException('Only admins can unassign users from admins');
+    }
+
+    // Verify user exists
+    const user = await this.prisma.user.findFirst({
+      where: { id: userId, organizationId },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    // Remove assigned admin
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: { assignedAdminId: null },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        isActive: true,
+        assignedAdminId: true,
+        createdAt: true,
+      },
+    });
   }
 }
