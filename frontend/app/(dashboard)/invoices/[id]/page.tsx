@@ -314,6 +314,16 @@ export default function InvoiceDetailPage() {
               <dd className="text-lg font-semibold text-gray-900">{invoice.provider}</dd>
             </div>
 
+            {invoice.organization && (
+              <div>
+                <dt className="text-sm font-medium text-gray-500 flex items-center gap-2 mb-1">
+                  <Building2 className="h-4 w-4" />
+                  Organization
+                </dt>
+                <dd className="text-lg font-semibold text-gray-900">{invoice.organization.name}</dd>
+              </div>
+            )}
+
             <div>
               <dt className="text-sm font-medium text-gray-500 flex items-center gap-2 mb-1">
                 <Calendar className="h-4 w-4" />

@@ -358,6 +358,11 @@ export default function InvoicesPage() {
                       </div>
                       <p className="text-xs sm:text-sm text-gray-500 truncate">
                         {invoice.provider} • {formatDate(invoice.billingDate)}
+                        {invoice.organization && (
+                          <span className="ml-2 text-gray-400">
+                            • {invoice.organization.name}
+                          </span>
+                        )}
                       </p>
                       {invoice.fileUrl && (
                         <div className="mt-1.5 flex items-center gap-2 flex-wrap">
