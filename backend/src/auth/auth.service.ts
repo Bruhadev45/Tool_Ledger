@@ -61,6 +61,19 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    // For ADMIN users without MFA: Allow first login to set up MFA
+    // Check if this is a fresh admin (no MFA, no lastLoginAt) - allow one-time login
+    if (user.role === UserRole.ADMIN && !user.mfaEnabled && !user.lastLoginAt) {
+      // Mark that they've logged in once (so they can set up MFA)
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { lastLoginAt: new Date() },
+      });
+      // Return user with a flag indicating they need to set up MFA
+      const { passwordHash, ...result } = user;
+      return { ...result, requiresMfaSetup: true };
+    }
+
     const { passwordHash, ...result } = user;
     return result;
   }
@@ -85,12 +98,37 @@ export class AuthService {
     role: UserRole;
     organizationId: string;
     mfaEnabled: boolean;
+    requiresMfaSetup?: boolean;
   }) {
-    // MFA is mandatory for ADMIN users
-    if (user.role === UserRole.ADMIN && !user.mfaEnabled) {
+    // MFA is mandatory for ADMIN users (except first-time login to set up MFA)
+    if (user.role === UserRole.ADMIN && !user.mfaEnabled && !user.requiresMfaSetup) {
       throw new UnauthorizedException(
         'Multi-factor authentication (MFA) is required for admin accounts. Please enable MFA in your account settings before logging in.',
       );
+    }
+    
+    // If this is first-time admin login, allow it but return a flag
+    if (user.requiresMfaSetup) {
+      return {
+        access_token: this.jwtService.sign({
+          email: user.email,
+          sub: user.id,
+          role: user.role,
+          organizationId: user.organizationId,
+        }),
+        refresh_token: await this.generateRefreshToken(user.id),
+        user: {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          role: user.role,
+          organizationId: user.organizationId,
+          mfaEnabled: false,
+        },
+        requiresMfaSetup: true,
+        message: 'Please set up MFA in your account settings before your next login.',
+      };
     }
 
     // Create JWT payload with user information

@@ -86,6 +86,12 @@ export class AuthController {
       };
     }
 
+    // Check if this is first-time admin login (needs MFA setup)
+    if (req.user.requiresMfaSetup) {
+      // Allow login but return flag to prompt MFA setup
+      return this.authService.login(req.user);
+    }
+
     // User authenticated successfully, generate tokens
     // req.user from LocalStrategy contains full user object
     return this.authService.login(req.user);
