@@ -54,8 +54,14 @@ export class InvoicesParserService {
             // pdfjs-dist v4.x is ESM-only, so we use dynamic import
             // Use Function constructor to preserve dynamic import syntax (prevents TypeScript from converting to require)
             // This ensures the dynamic import is executed at runtime, not transformed by TypeScript compiler
+            // Create dynamic import function at runtime to avoid TypeScript transformation
             const importPdfjs = new Function('specifier', 'return import(specifier)');
             const pdfjsLib = await importPdfjs('pdfjs-dist/legacy/build/pdf.mjs');
+            
+            if (!pdfjsLib || !pdfjsLib.getDocument) {
+              throw new Error('pdfjs-dist module loaded but getDocument is not available');
+            }
+            
             const loadingTask = pdfjsLib.getDocument({
               data: new Uint8Array(file.buffer),
               verbosity: 0, // Suppress warnings
