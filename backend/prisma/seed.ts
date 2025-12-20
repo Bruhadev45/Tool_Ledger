@@ -774,188 +774,213 @@ async function main() {
     console.log(`✅ Created ${invoices.length} invoices`);
   }
 
-  // Link invoices to credentials
+  // Link invoices to credentials (skip if they exist)
   console.log('\n🔗 Linking invoices to credentials...');
-  const invoiceCredentialLinks = [
-    { invoiceIndex: 0, credentialIndex: 0 }, // ChatGPT invoice -> ChatGPT credential
-    { invoiceIndex: 1, credentialIndex: 1 }, // Orchids invoice -> Orchids credential
-    { invoiceIndex: 2, credentialIndex: 2 }, // Cursor invoice -> Cursor credential
-    { invoiceIndex: 3, credentialIndex: 3 }, // Claude invoice -> Claude credential
-    { invoiceIndex: 4, credentialIndex: 4 }, // GitHub Copilot invoice -> GitHub Copilot credential
-    { invoiceIndex: 5, credentialIndex: 5 }, // AWS invoice -> AWS credential
-    { invoiceIndex: 6, credentialIndex: 6 }, // GCP invoice -> GCP credential
-    { invoiceIndex: 7, credentialIndex: 7 }, // Azure invoice -> Azure credential
-    { invoiceIndex: 8, credentialIndex: 8 }, // GitHub invoice -> GitHub credential
-    { invoiceIndex: 9, credentialIndex: 9 }, // GitLab invoice -> GitLab credential
-    { invoiceIndex: 10, credentialIndex: 10 }, // MongoDB invoice -> MongoDB credential
-    { invoiceIndex: 11, credentialIndex: 11 }, // Supabase invoice -> Supabase credential
-    { invoiceIndex: 12, credentialIndex: 12 }, // Stripe invoice -> Stripe credential
-    { invoiceIndex: 13, credentialIndex: 13 }, // SendGrid invoice -> SendGrid credential
-    { invoiceIndex: 14, credentialIndex: 14 }, // Slack invoice -> Slack credential
-    { invoiceIndex: 15, credentialIndex: 15 }, // Figma invoice -> Figma credential
-    { invoiceIndex: 16, credentialIndex: 16 }, // Adobe invoice -> Adobe credential
-  ];
+  const existingLinks = await prisma.invoiceCredentialLink.count();
+  if (existingLinks > 0) {
+    console.log(`   ⏩ Skipping - ${existingLinks} invoice-credential links already exist`);
+  } else {
+    const invoiceCredentialLinks = [
+      { invoiceIndex: 0, credentialIndex: 0 }, // ChatGPT invoice -> ChatGPT credential
+      { invoiceIndex: 1, credentialIndex: 1 }, // Orchids invoice -> Orchids credential
+      { invoiceIndex: 2, credentialIndex: 2 }, // Cursor invoice -> Cursor credential
+      { invoiceIndex: 3, credentialIndex: 3 }, // Claude invoice -> Claude credential
+      { invoiceIndex: 4, credentialIndex: 4 }, // GitHub Copilot invoice -> GitHub Copilot credential
+      { invoiceIndex: 5, credentialIndex: 5 }, // AWS invoice -> AWS credential
+      { invoiceIndex: 6, credentialIndex: 6 }, // GCP invoice -> GCP credential
+      { invoiceIndex: 7, credentialIndex: 7 }, // Azure invoice -> Azure credential
+      { invoiceIndex: 8, credentialIndex: 8 }, // GitHub invoice -> GitHub credential
+      { invoiceIndex: 9, credentialIndex: 9 }, // GitLab invoice -> GitLab credential
+      { invoiceIndex: 10, credentialIndex: 10 }, // MongoDB invoice -> MongoDB credential
+      { invoiceIndex: 11, credentialIndex: 11 }, // Supabase invoice -> Supabase credential
+      { invoiceIndex: 12, credentialIndex: 12 }, // Stripe invoice -> Stripe credential
+      { invoiceIndex: 13, credentialIndex: 13 }, // SendGrid invoice -> SendGrid credential
+      { invoiceIndex: 14, credentialIndex: 14 }, // Slack invoice -> Slack credential
+      { invoiceIndex: 15, credentialIndex: 15 }, // Figma invoice -> Figma credential
+      { invoiceIndex: 16, credentialIndex: 16 }, // Adobe invoice -> Adobe credential
+    ];
 
-  for (const link of invoiceCredentialLinks) {
-    if (invoices[link.invoiceIndex] && credentials[link.credentialIndex]) {
-      await prisma.invoiceCredentialLink.create({
-        data: {
-          invoiceId: invoices[link.invoiceIndex].id,
-          credentialId: credentials[link.credentialIndex].id,
-        },
-      });
+  const existingLinks = await prisma.invoiceCredentialLink.count();
+  if (existingLinks > 0) {
+    console.log(`   ⏩ Skipping - ${existingLinks} invoice-credential links already exist`);
+  } else {
+    for (const link of invoiceCredentialLinks) {
+      if (invoices[link.invoiceIndex] && credentials[link.credentialIndex]) {
+        await prisma.invoiceCredentialLink.create({
+          data: {
+            invoiceId: invoices[link.invoiceIndex].id,
+            credentialId: credentials[link.credentialIndex].id,
+          },
+        });
+      }
     }
+    console.log('✅ Created invoice-credential links');
   }
-  console.log('✅ Created invoice-credential links');
+  }
 
-  // Create comments
+  // Create comments (skip if they exist)
   console.log('\n💬 Creating comments...');
-  await prisma.comment.create({
-    data: {
-      content: 'ChatGPT API usage has increased significantly this month. Consider upgrading plan.',
-      credentialId: credentials[0].id,
-      userId: admin1.id,
-    },
-  });
-  await prisma.comment.create({
-    data: {
-      content: 'Orchids AI integration completed successfully. API key rotated.',
-      credentialId: credentials[1].id,
-      userId: user1.id,
-    },
-  });
-  await prisma.comment.create({
-    data: {
-      content: 'Cursor IDE is working great for the team. Renew subscription next month.',
-      credentialId: credentials[2].id,
-      userId: user2.id,
-    },
-  });
-  await prisma.comment.create({
-    data: {
-      content: 'Please verify this invoice amount matches our ChatGPT subscription.',
-      invoiceId: invoices[0].id,
-      userId: admin1.id,
-    },
-  });
-  await prisma.comment.create({
-    data: {
-      content: 'Orchids invoice approved - matches expected billing.',
-      invoiceId: invoices[1].id,
-      userId: admin1.id,
-    },
-  });
-  console.log('✅ Created comments');
+  const existingComments = await prisma.comment.count();
+  if (existingComments > 0) {
+    console.log(`   ⏩ Skipping - ${existingComments} comments already exist`);
+  } else if (credentials.length >= 3 && invoices.length >= 2) {
+    await prisma.comment.create({
+      data: {
+        content: 'ChatGPT API usage has increased significantly this month. Consider upgrading plan.',
+        credentialId: credentials[0].id,
+        userId: admin1.id,
+      },
+    });
+    await prisma.comment.create({
+      data: {
+        content: 'Orchids AI integration completed successfully. API key rotated.',
+        credentialId: credentials[1].id,
+        userId: user1.id,
+      },
+    });
+    await prisma.comment.create({
+      data: {
+        content: 'Cursor IDE is working great for the team. Renew subscription next month.',
+        credentialId: credentials[2].id,
+        userId: user2.id,
+      },
+    });
+    await prisma.comment.create({
+      data: {
+        content: 'Please verify this invoice amount matches our ChatGPT subscription.',
+        invoiceId: invoices[0].id,
+        userId: admin1.id,
+      },
+    });
+    await prisma.comment.create({
+      data: {
+        content: 'Orchids invoice approved - matches expected billing.',
+        invoiceId: invoices[1].id,
+        userId: admin1.id,
+      },
+    });
+    console.log('✅ Created comments');
+  }
 
-  // Create notifications
+  // Create notifications (skip if they already exist)
   console.log('\n🔔 Creating notifications...');
-  await prisma.notification.createMany({
-    data: [
-      {
-        userId: admin1.id,
-        type: 'invoice_upload',
-        title: 'New Invoice Uploaded',
-        message: 'A new invoice INV-2024-004 has been uploaded and requires approval.',
-        read: false,
-        metadata: JSON.stringify({ invoiceId: invoices[3]?.id }),
-      },
-      {
-        userId: user1.id,
-        type: 'access_request',
-        title: 'Credential Access Request',
-        message: 'Admin User has requested access to ChatGPT Plus.',
-        read: false,
-      },
-      {
-        userId: admin1.id,
-        type: 'approval',
-        title: 'Invoice Approved',
-        message: 'Invoice INV-2024-001 has been approved.',
-        read: true,
-        metadata: JSON.stringify({ invoiceId: invoices[0]?.id }),
-      },
-      {
-        userId: user2.id,
-        type: 'invoice_upload',
-        title: 'Invoice Approved',
-        message: 'Invoice INV-2024-003 (Cursor) has been approved.',
-        read: false,
-        metadata: JSON.stringify({ invoiceId: invoices[2]?.id }),
-      },
-    ],
-  });
-  console.log('✅ Created notifications');
+  const existingNotifications = await prisma.notification.count();
+  if (existingNotifications > 0) {
+    console.log(`   ⏩ Skipping - ${existingNotifications} notifications already exist`);
+  } else {
+    await prisma.notification.createMany({
+      data: [
+        {
+          userId: admin1.id,
+          type: 'invoice_upload',
+          title: 'New Invoice Uploaded',
+          message: 'A new invoice INV-2024-004 has been uploaded and requires approval.',
+          read: false,
+          metadata: JSON.stringify({ invoiceId: invoices[3]?.id }),
+        },
+        {
+          userId: user1.id,
+          type: 'access_request',
+          title: 'Credential Access Request',
+          message: 'Admin User has requested access to ChatGPT Plus.',
+          read: false,
+        },
+        {
+          userId: admin1.id,
+          type: 'approval',
+          title: 'Invoice Approved',
+          message: 'Invoice INV-2024-001 has been approved.',
+          read: true,
+          metadata: JSON.stringify({ invoiceId: invoices[0]?.id }),
+        },
+        {
+          userId: user2.id,
+          type: 'invoice_upload',
+          title: 'Invoice Approved',
+          message: 'Invoice INV-2024-003 (Cursor) has been approved.',
+          read: false,
+          metadata: JSON.stringify({ invoiceId: invoices[2]?.id }),
+        },
+      ],
+    });
+    console.log('✅ Created notifications');
+  }
 
-  // Create audit logs
+  // Create audit logs (skip if they already exist)
   console.log('\n📊 Creating audit logs...');
-  await prisma.auditLog.createMany({
-    data: [
-      {
-        action: AuditAction.CREATE,
-        resourceType: 'credential',
-        resourceId: credentials[0]?.id,
-        userId: admin1.id,
-        organizationId: organization.id,
-        ipAddress: '192.168.1.100',
-        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-        metadata: JSON.stringify({ credentialName: credentials[0]?.name }),
-      },
-      {
-        action: AuditAction.CREATE,
-        resourceType: 'credential',
-        resourceId: credentials[1]?.id,
-        userId: user1.id,
-        organizationId: organization.id,
-        ipAddress: '192.168.1.101',
-        metadata: JSON.stringify({ credentialName: credentials[1]?.name }),
-      },
-      {
-        action: AuditAction.CREATE,
-        resourceType: 'credential',
-        resourceId: credentials[2]?.id,
-        userId: user2.id,
-        organizationId: organization.id,
-        ipAddress: '192.168.1.102',
-        metadata: JSON.stringify({ credentialName: credentials[2]?.name }),
-      },
-      {
-        action: AuditAction.UPLOAD,
-        resourceType: 'invoice',
-        resourceId: invoices[0]?.id,
-        userId: admin1.id,
-        organizationId: organization.id,
-        ipAddress: '192.168.1.100',
-        metadata: JSON.stringify({ invoiceNumber: invoices[0]?.invoiceNumber }),
-      },
-      {
-        action: AuditAction.APPROVE,
-        resourceType: 'invoice',
-        resourceId: invoices[0]?.id,
-        userId: admin1.id,
-        organizationId: organization.id,
-        ipAddress: '192.168.1.100',
-        metadata: JSON.stringify({ invoiceNumber: invoices[0]?.invoiceNumber }),
-      },
-      {
-        action: AuditAction.READ,
-        resourceType: 'credential',
-        resourceId: credentials[0]?.id,
-        userId: user1.id,
-        organizationId: organization.id,
-        ipAddress: '192.168.1.101',
-      },
-      {
-        action: AuditAction.SHARE,
-        resourceType: 'credential',
-        resourceId: credentials[0]?.id,
-        userId: admin1.id,
-        organizationId: organization.id,
-        ipAddress: '192.168.1.100',
-        metadata: JSON.stringify({ sharedWith: user1.email }),
-      },
-    ],
-  });
-  console.log('✅ Created audit logs');
+  const existingAuditLogs = await prisma.auditLog.count();
+  if (existingAuditLogs > 0) {
+    console.log(`   ⏩ Skipping - ${existingAuditLogs} audit logs already exist`);
+  } else if (credentials.length >= 3 && invoices.length >= 1) {
+    await prisma.auditLog.createMany({
+      data: [
+        {
+          action: AuditAction.CREATE,
+          resourceType: 'credential',
+          resourceId: credentials[0]?.id,
+          userId: admin1.id,
+          organizationId: organization.id,
+          ipAddress: '192.168.1.100',
+          userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+          metadata: JSON.stringify({ credentialName: credentials[0]?.name }),
+        },
+        {
+          action: AuditAction.CREATE,
+          resourceType: 'credential',
+          resourceId: credentials[1]?.id,
+          userId: user1.id,
+          organizationId: organization.id,
+          ipAddress: '192.168.1.101',
+          metadata: JSON.stringify({ credentialName: credentials[1]?.name }),
+        },
+        {
+          action: AuditAction.CREATE,
+          resourceType: 'credential',
+          resourceId: credentials[2]?.id,
+          userId: user2.id,
+          organizationId: organization.id,
+          ipAddress: '192.168.1.102',
+          metadata: JSON.stringify({ credentialName: credentials[2]?.name }),
+        },
+        {
+          action: AuditAction.UPLOAD,
+          resourceType: 'invoice',
+          resourceId: invoices[0]?.id,
+          userId: admin1.id,
+          organizationId: organization.id,
+          ipAddress: '192.168.1.100',
+          metadata: JSON.stringify({ invoiceNumber: invoices[0]?.invoiceNumber }),
+        },
+        {
+          action: AuditAction.APPROVE,
+          resourceType: 'invoice',
+          resourceId: invoices[0]?.id,
+          userId: admin1.id,
+          organizationId: organization.id,
+          ipAddress: '192.168.1.100',
+          metadata: JSON.stringify({ invoiceNumber: invoices[0]?.invoiceNumber }),
+        },
+        {
+          action: AuditAction.READ,
+          resourceType: 'credential',
+          resourceId: credentials[0]?.id,
+          userId: user1.id,
+          organizationId: organization.id,
+          ipAddress: '192.168.1.101',
+        },
+        {
+          action: AuditAction.SHARE,
+          resourceType: 'credential',
+          resourceId: credentials[0]?.id,
+          userId: admin1.id,
+          organizationId: organization.id,
+          ipAddress: '192.168.1.100',
+          metadata: JSON.stringify({ sharedWith: user1.email }),
+        },
+      ],
+    });
+    console.log('✅ Created audit logs');
+  }
 
   console.log('\n📋 Demo Login Credentials:');
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');

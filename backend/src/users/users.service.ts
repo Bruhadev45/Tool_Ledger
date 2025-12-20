@@ -41,8 +41,7 @@ export class UsersService {
 
     // Admins can see all users across all organizations
     // Accountants can only see users in their own organization
-    const whereClause =
-      requesterRole === UserRole.ADMIN ? {} : { organizationId };
+    const whereClause = requesterRole === UserRole.ADMIN ? {} : { organizationId };
 
     return this.prisma.user.findMany({
       where: whereClause,
