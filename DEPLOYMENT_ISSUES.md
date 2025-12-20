@@ -76,9 +76,10 @@ The build runs these commands:
 - **Start Command:** `sh start.sh`
 - **Port:** Uses `PORT` env var (Railway provides)
 
-## Next Steps
+### 4. ✅ Redundant Config Files Removed (FIXED)
+**Problem:** Root `railway.json` and `package-lock.json` were redundant and potentially incorrect for the monorepo-style structure.
+**Solution:** Removed root configs and optimized service-specific `railway.json` files with healthchecks.
 
-1. ✅ Node version fixed - pushed to repo
-2. ⏳ Verify package-lock.json is up to date
-3. ⏳ Check Railway deployment logs after next deploy
-4. ⏳ Verify all environment variables are set
+### 5. ✅ Build Output Verified (FIXED)
+**Problem:** Uncertainty about `dist/main.js` location.
+**Solution:** Verified that `npm run build` produces `dist/main.js` at the expected location for `start.sh`.
