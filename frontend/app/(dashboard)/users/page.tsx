@@ -1,14 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useSession } from 'next-auth/react';
 import api from '@/lib/api';
-import { Users, Shield, User, Mail, Edit, Check, X, Plus, Trash2, ArrowUp, ArrowDown, Filter, Building2 } from 'lucide-react';
+import { Users, Shield, User, Mail, Edit, Check, X, Plus, Trash2, ArrowUp, ArrowDown, Filter, Building2, RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function UsersPage() {
   const { data: session } = useSession();
-  const [users, setUsers] = useState<any[]>([]);
+  const [rawUsers, setRawUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState('createdAt');
@@ -27,12 +27,8 @@ export default function UsersPage() {
     role: 'USER',
     teamId: '',
   });
-
-  useEffect(() => {
-    loadUsers();
-    loadTeams();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sortBy, sortOrder, filterRole, filterStatus]);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const loadTeams = async () => {
     try {
@@ -43,68 +39,104 @@ export default function UsersPage() {
     }
   };
 
-  const loadUsers = async () => {
+  const loadUsers = useCallback(async (showLoading = true) => {
     try {
-      setLoading(true);
+      if (showLoading) setLoading(true);
+      setIsRefreshing(true);
       setError(null);
       const res = await api.get('/users');
-      let data = res.data || [];
-      
-      // Filter by role and status
-      if (filterRole) {
-        data = data.filter((u: any) => u.role === filterRole);
-      }
-      if (filterStatus) {
-        data = data.filter((u: any) => {
-          if (filterStatus === 'active') return u.isActive === true;
-          if (filterStatus === 'inactive') return u.isActive === false;
-          return true;
-        });
-      }
-      
-      // Client-side sorting
-      data = [...data].sort((a, b) => {
-        let aVal: any, bVal: any;
-        switch (sortBy) {
-          case 'name':
-            aVal = `${a.firstName || ''} ${a.lastName || ''}`.toLowerCase();
-            bVal = `${b.firstName || ''} ${b.lastName || ''}`.toLowerCase();
-            break;
-          case 'email':
-            aVal = a.email?.toLowerCase() || '';
-            bVal = b.email?.toLowerCase() || '';
-            break;
-          case 'role':
-            aVal = a.role || '';
-            bVal = b.role || '';
-            break;
-          case 'status':
-            aVal = a.isActive ? 1 : 0;
-            bVal = b.isActive ? 1 : 0;
-            break;
-          case 'createdAt':
-            aVal = new Date(a.createdAt).getTime();
-            bVal = new Date(b.createdAt).getTime();
-            break;
-          default:
-            aVal = new Date(a.createdAt).getTime();
-            bVal = new Date(b.createdAt).getTime();
-        }
-        
-        if (aVal < bVal) return sortOrder === 'asc' ? -1 : 1;
-        if (aVal > bVal) return sortOrder === 'asc' ? 1 : -1;
-        return 0;
-      });
-      
-      setUsers(data);
+      setRawUsers(res.data || []);
+      setLastUpdated(new Date());
     } catch (error: any) {
       console.error('Error loading users:', error);
       setError(error.response?.data?.message || 'Failed to load users');
-      toast.error('Failed to load users');
+      if (showLoading) toast.error('Failed to load users');
     } finally {
       setLoading(false);
+      setIsRefreshing(false);
     }
-  };
+  }, []);
+
+  // Apply filtering and sorting using useMemo
+  const users = useMemo(() => {
+    let data = [...rawUsers];
+    
+    // Filter by role and status
+    if (filterRole) {
+      data = data.filter((u: any) => u.role === filterRole);
+    }
+    if (filterStatus) {
+      data = data.filter((u: any) => {
+        if (filterStatus === 'active') return u.isActive === true;
+        if (filterStatus === 'inactive') return u.isActive === false;
+        return true;
+      });
+    }
+    
+    // Client-side sorting
+    data.sort((a, b) => {
+      let aVal: any, bVal: any;
+      switch (sortBy) {
+        case 'name':
+          aVal = `${a.firstName || ''} ${a.lastName || ''}`.toLowerCase();
+          bVal = `${b.firstName || ''} ${b.lastName || ''}`.toLowerCase();
+          break;
+        case 'email':
+          aVal = a.email?.toLowerCase() || '';
+          bVal = b.email?.toLowerCase() || '';
+          break;
+        case 'role':
+          aVal = a.role || '';
+          bVal = b.role || '';
+          break;
+        case 'status':
+          aVal = a.isActive ? 1 : 0;
+          bVal = b.isActive ? 1 : 0;
+          break;
+        case 'createdAt':
+          aVal = new Date(a.createdAt).getTime();
+          bVal = new Date(b.createdAt).getTime();
+          break;
+        default:
+          aVal = new Date(a.createdAt).getTime();
+          bVal = new Date(b.createdAt).getTime();
+      }
+      
+      if (aVal < bVal) return sortOrder === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortOrder === 'asc' ? 1 : -1;
+      return 0;
+    });
+    
+    return data;
+  }, [rawUsers, filterRole, filterStatus, sortBy, sortOrder]);
+
+  // Initial load
+  useEffect(() => {
+    loadUsers();
+    loadTeams();
+  }, [loadUsers]);
+
+  // Real-time refresh: every 30 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      loadUsers(false);
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [loadUsers]);
+
+  // Refresh on window focus
+  useEffect(() => {
+    const handleFocus = () => loadUsers(false);
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [loadUsers]);
+
+  // Refresh on network reconnect
+  useEffect(() => {
+    const handleOnline = () => loadUsers(false);
+    window.addEventListener('online', handleOnline);
+    return () => window.removeEventListener('online', handleOnline);
+  }, [loadUsers]);
 
   const handleEdit = (user: any) => {
     setEditingUser(user.id);
@@ -211,7 +243,7 @@ export default function UsersPage() {
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Failed to Load Users</h3>
             <p className="text-sm text-gray-600 mb-4">{error}</p>
             <button
-              onClick={loadUsers}
+              onClick={() => { loadUsers(); }}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
             >
               Retry
@@ -245,7 +277,22 @@ export default function UsersPage() {
   return (
     <div className="space-y-6 w-full">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-        <h1 className="text-2xl font-bold text-gray-900">Users</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-bold text-gray-900">Users</h1>
+          <button
+            onClick={() => { loadUsers(false); }}
+            disabled={isRefreshing}
+            className={`p-1.5 rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors ${isRefreshing ? 'animate-spin' : ''}`}
+            title="Refresh data"
+          >
+            <RefreshCw className="h-4 w-4" />
+          </button>
+          {lastUpdated && (
+            <span className="text-xs text-gray-400 hidden sm:inline">
+              Updated {lastUpdated.toLocaleTimeString()}
+            </span>
+          )}
+        </div>
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-2 border border-gray-300 rounded-md bg-white">

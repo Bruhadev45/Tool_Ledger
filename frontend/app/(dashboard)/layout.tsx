@@ -2,7 +2,7 @@
 
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Sidebar from '@/components/layout/Sidebar';
 import Header from '@/components/layout/Header';
 
@@ -11,15 +11,44 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { data: session, status } = useSession();
+  const { data: session, status, update } = useSession();
   const router = useRouter();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  // Periodic session refresh for real-time data sync (every 2 minutes)
+  const refreshSession = useCallback(async () => {
+    try {
+      await update();
+    } catch (error) {
+      console.warn('Session refresh failed:', error);
+    }
+  }, [update]);
 
   useEffect(() => {
     if (status === 'unauthenticated') {
       router.push('/login');
     }
   }, [status, router]);
+
+  // Auto-refresh session every 2 minutes for real-time role/data sync
+  useEffect(() => {
+    if (status === 'authenticated') {
+      const interval = setInterval(refreshSession, 2 * 60 * 1000); // 2 minutes
+      return () => clearInterval(interval);
+    }
+  }, [status, refreshSession]);
+
+  // Refresh session when window gains focus (user switches back to tab)
+  useEffect(() => {
+    const handleFocus = () => {
+      if (status === 'authenticated') {
+        refreshSession();
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [status, refreshSession]);
 
   // Close mobile menu when route changes
   useEffect(() => {

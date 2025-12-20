@@ -8,17 +8,40 @@ const API_URL = rawApiUrl.endsWith('/api') ? rawApiUrl : `${rawApiUrl}/api`;
 
 async function refreshAccessToken(token: any) {
   try {
+    // Refresh the access token
     const response = await axios.post(`${API_URL}/auth/refresh`, {
       refreshToken: token.refreshToken,
     });
 
     const refreshedTokens = response.data;
 
+    // Also fetch the latest user profile to get updated role and other data
+    let updatedRole = token.role;
+    let updatedOrganizationId = token.organizationId;
+    
+    try {
+      const profileResponse = await axios.get(`${API_URL}/auth/profile`, {
+        headers: {
+          Authorization: `Bearer ${refreshedTokens.access_token}`,
+        },
+      });
+      
+      if (profileResponse.data) {
+        updatedRole = profileResponse.data.role;
+        updatedOrganizationId = profileResponse.data.organizationId;
+      }
+    } catch (profileError) {
+      // If profile fetch fails, continue with existing role data
+      console.warn('Failed to refresh user profile:', profileError);
+    }
+
     return {
       ...token,
       accessToken: refreshedTokens.access_token,
-      accessTokenExpires: Date.now() + (15 * 60 * 1000), // 15 minutes
-      refreshToken: token.refreshToken, // Keep the same refresh token
+      accessTokenExpires: Date.now() + (5 * 60 * 1000), // 5 minutes (refresh more often for real-time sync)
+      refreshToken: token.refreshToken,
+      role: updatedRole,
+      organizationId: updatedOrganizationId,
     };
   } catch (error) {
     console.error('Error refreshing access token', error);
@@ -88,7 +111,7 @@ const authOptions: NextAuthOptions = {
                 organizationId: mfaResponse.data.user.organizationId,
                 accessToken: mfaResponse.data.access_token,
                 refreshToken: mfaResponse.data.refresh_token,
-                accessTokenExpires: Date.now() + (15 * 60 * 1000), // 15 minutes from now
+                accessTokenExpires: Date.now() + (5 * 60 * 1000), // 5 minutes from now (for real-time sync)
               };
             } catch (mfaError: any) {
               // Handle MFA verification errors
@@ -116,7 +139,7 @@ const authOptions: NextAuthOptions = {
             organizationId: loginResponse.data.user.organizationId,
             accessToken: loginResponse.data.access_token,
             refreshToken: loginResponse.data.refresh_token,
-            accessTokenExpires: Date.now() + (15 * 60 * 1000), // 15 minutes from now
+            accessTokenExpires: Date.now() + (5 * 60 * 1000), // 5 minutes from now (for real-time sync)
           };
 
           return userData;

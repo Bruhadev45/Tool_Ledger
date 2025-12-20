@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useSession } from 'next-auth/react';
 import api from '@/lib/api';
-import { FileText, Plus, Download, Check, X, Filter, Eye, Tag, MessageSquare, ArrowUpDown, ArrowUp, ArrowDown, Search, Trash2 } from 'lucide-react';
+import { FileText, Plus, Download, Check, X, Filter, Eye, Tag, MessageSquare, ArrowUpDown, ArrowUp, ArrowDown, Search, Trash2, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import toast from 'react-hot-toast';
@@ -13,7 +13,7 @@ export default function InvoicesPage() {
   const role = (session?.user as any)?.role;
   const isAdmin = role === 'ADMIN';
   const isAccountant = role === 'ACCOUNTANT';
-  const [invoices, setInvoices] = useState<any[]>([]);
+  const [rawInvoices, setRawInvoices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState({
@@ -29,15 +29,13 @@ export default function InvoicesPage() {
   const [selectedInvoice, setSelectedInvoice] = useState<string | null>(null);
   const [commentText, setCommentText] = useState('');
   const [showCommentModal, setShowCommentModal] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  useEffect(() => {
-    loadInvoices();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const loadInvoices = async () => {
+  const loadInvoices = useCallback(async (showLoading = true) => {
     try {
-      setLoading(true);
+      if (showLoading) setLoading(true);
+      setIsRefreshing(true);
       setError(null);
       const params = new URLSearchParams();
       if (filters.status) params.append('status', filters.status);
@@ -46,70 +44,99 @@ export default function InvoicesPage() {
       if (filters.endDate) params.append('endDate', filters.endDate);
       
       const res = await api.get(`/invoices${params.toString() ? `?${params.toString()}` : ''}`);
-      let data = res.data || [];
-      
-      // Client-side search
-      if (searchQuery.trim()) {
-        const query = searchQuery.toLowerCase();
-        data = data.filter((invoice: any) => {
-          return (
-            invoice.invoiceNumber?.toLowerCase().includes(query) ||
-            invoice.provider?.toLowerCase().includes(query) ||
-            invoice.amount?.toString().includes(query) ||
-            invoice.category?.toLowerCase().includes(query) ||
-            invoice.status?.toLowerCase().includes(query)
-          );
-        });
-      }
-      
-      // Client-side sorting
-      data = [...data].sort((a, b) => {
-        let aVal: any, bVal: any;
-        switch (sortBy) {
-          case 'billingDate':
-            aVal = new Date(a.billingDate).getTime();
-            bVal = new Date(b.billingDate).getTime();
-            break;
-          case 'amount':
-            aVal = Number(a.amount);
-            bVal = Number(b.amount);
-            break;
-          case 'provider':
-            aVal = a.provider?.toLowerCase() || '';
-            bVal = b.provider?.toLowerCase() || '';
-            break;
-          case 'status':
-            aVal = a.status || '';
-            bVal = b.status || '';
-            break;
-          case 'invoiceNumber':
-            aVal = a.invoiceNumber?.toLowerCase() || '';
-            bVal = b.invoiceNumber?.toLowerCase() || '';
-            break;
-          default:
-            aVal = new Date(a.createdAt).getTime();
-            bVal = new Date(b.createdAt).getTime();
-        }
-        
-        if (aVal < bVal) return sortOrder === 'asc' ? -1 : 1;
-        if (aVal > bVal) return sortOrder === 'asc' ? 1 : -1;
-        return 0;
-      });
-      
-      setInvoices(data);
+      setRawInvoices(res.data || []);
+      setLastUpdated(new Date());
     } catch (error: any) {
       console.error('Error loading invoices:', error);
       setError(error.response?.data?.message || 'Failed to load invoices');
-      toast.error('Failed to load invoices');
+      if (showLoading) toast.error('Failed to load invoices');
     } finally {
       setLoading(false);
+      setIsRefreshing(false);
     }
-  };
+  }, [filters.status, filters.provider, filters.startDate, filters.endDate]);
 
+  // Apply filtering and sorting using useMemo for performance
+  const invoices = useMemo(() => {
+    let data = [...rawInvoices];
+    
+    // Client-side search
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      data = data.filter((invoice: any) => {
+        return (
+          invoice.invoiceNumber?.toLowerCase().includes(query) ||
+          invoice.provider?.toLowerCase().includes(query) ||
+          invoice.amount?.toString().includes(query) ||
+          invoice.category?.toLowerCase().includes(query) ||
+          invoice.status?.toLowerCase().includes(query)
+        );
+      });
+    }
+    
+    // Client-side sorting
+    data.sort((a, b) => {
+      let aVal: any, bVal: any;
+      switch (sortBy) {
+        case 'billingDate':
+          aVal = new Date(a.billingDate).getTime();
+          bVal = new Date(b.billingDate).getTime();
+          break;
+        case 'amount':
+          aVal = Number(a.amount);
+          bVal = Number(b.amount);
+          break;
+        case 'provider':
+          aVal = a.provider?.toLowerCase() || '';
+          bVal = b.provider?.toLowerCase() || '';
+          break;
+        case 'status':
+          aVal = a.status || '';
+          bVal = b.status || '';
+          break;
+        case 'invoiceNumber':
+          aVal = a.invoiceNumber?.toLowerCase() || '';
+          bVal = b.invoiceNumber?.toLowerCase() || '';
+          break;
+        default:
+          aVal = new Date(a.createdAt).getTime();
+          bVal = new Date(b.createdAt).getTime();
+      }
+      
+      if (aVal < bVal) return sortOrder === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortOrder === 'asc' ? 1 : -1;
+      return 0;
+    });
+    
+    return data;
+  }, [rawInvoices, searchQuery, sortBy, sortOrder]);
+
+  // Initial load and filter changes
   useEffect(() => {
     loadInvoices();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters.status, filters.provider, filters.startDate, filters.endDate, sortBy, sortOrder, searchQuery]);
+  }, [loadInvoices]);
+
+  // Real-time refresh: every 30 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      loadInvoices(false);
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [loadInvoices]);
+
+  // Refresh on window focus
+  useEffect(() => {
+    const handleFocus = () => loadInvoices(false);
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [loadInvoices]);
+
+  // Refresh on network reconnect
+  useEffect(() => {
+    const handleOnline = () => loadInvoices(false);
+    window.addEventListener('online', handleOnline);
+    return () => window.removeEventListener('online', handleOnline);
+  }, [loadInvoices]);
 
   const handleDownload = async (invoiceId: string) => {
     try {
@@ -214,7 +241,7 @@ export default function InvoicesPage() {
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Failed to Load Invoices</h3>
             <p className="text-sm text-gray-600 mb-4">{error}</p>
             <button
-              onClick={loadInvoices}
+              onClick={() => { loadInvoices(); }}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
             >
               Retry
@@ -241,7 +268,22 @@ export default function InvoicesPage() {
   return (
     <div className="space-y-4 sm:space-y-6 w-full">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 sticky top-16 bg-white z-20 pb-4 pt-2 border-b border-gray-200 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8">
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Invoices</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Invoices</h1>
+          <button
+            onClick={() => { loadInvoices(false); }}
+            disabled={isRefreshing}
+            className={`p-1.5 rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors ${isRefreshing ? 'animate-spin' : ''}`}
+            title="Refresh data"
+          >
+            <RefreshCw className="h-4 w-4" />
+          </button>
+          {lastUpdated && (
+            <span className="text-xs text-gray-400 hidden sm:inline">
+              Updated {lastUpdated.toLocaleTimeString()}
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-2 sm:gap-3">
           {/* Search Input */}
           <div className="relative flex-1 sm:flex-initial sm:w-64">

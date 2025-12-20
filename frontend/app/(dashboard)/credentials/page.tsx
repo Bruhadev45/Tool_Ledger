@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useSession } from 'next-auth/react';
 import api from '@/lib/api';
-import { Key, Plus, Filter, Trash2, Download, FileText, Share2, ArrowUp, ArrowDown } from 'lucide-react';
+import { Key, Plus, Filter, Trash2, Download, FileText, Share2, ArrowUp, ArrowDown, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { formatDate } from '@/lib/utils';
@@ -12,84 +12,109 @@ export default function CredentialsPage() {
   const { data: session } = useSession();
   const role = (session?.user as any)?.role;
   const isAdmin = role === 'ADMIN';
-  const [credentials, setCredentials] = useState<any[]>([]);
+  const [rawCredentials, setRawCredentials] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filterOwner, setFilterOwner] = useState('');
   const [sortBy, setSortBy] = useState('createdAt');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  useEffect(() => {
-    loadCredentials();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const loadCredentials = async () => {
+  const loadCredentials = useCallback(async (showLoading = true) => {
     try {
-      setLoading(true);
+      if (showLoading) setLoading(true);
+      setIsRefreshing(true);
       setError(null);
       const res = await api.get('/credentials');
-      let data = res.data;
-      
-      // Filter by owner if filter is set
-      if (filterOwner && isAdmin) {
-        data = data.filter((cred: any) => 
-          cred.owner?.email?.toLowerCase().includes(filterOwner.toLowerCase()) ||
-          cred.owner?.firstName?.toLowerCase().includes(filterOwner.toLowerCase()) ||
-          cred.owner?.lastName?.toLowerCase().includes(filterOwner.toLowerCase())
-        );
-      }
-      
-      // Client-side sorting
-      data = [...data].sort((a, b) => {
-        let aVal: any, bVal: any;
-        switch (sortBy) {
-          case 'name':
-            aVal = a.name?.toLowerCase() || '';
-            bVal = b.name?.toLowerCase() || '';
-            break;
-          case 'createdAt':
-            aVal = new Date(a.createdAt).getTime();
-            bVal = new Date(b.createdAt).getTime();
-            break;
-          case 'owner':
-            aVal = `${a.owner?.firstName || ''} ${a.owner?.lastName || ''}`.toLowerCase();
-            bVal = `${b.owner?.firstName || ''} ${b.owner?.lastName || ''}`.toLowerCase();
-            break;
-          case 'isPaid':
-            // Sort by paid status: paid tools first (true), then free tools (false)
-            aVal = a.isPaid ? 1 : 0;
-            bVal = b.isPaid ? 1 : 0;
-            break;
-          case 'hasAutopay':
-            // Sort by autopay status: autopay enabled first (true), then disabled (false)
-            aVal = a.hasAutopay ? 1 : 0;
-            bVal = b.hasAutopay ? 1 : 0;
-            break;
-          default:
-            aVal = new Date(a.createdAt).getTime();
-            bVal = new Date(b.createdAt).getTime();
-        }
-        
-        if (aVal < bVal) return sortOrder === 'asc' ? -1 : 1;
-        if (aVal > bVal) return sortOrder === 'asc' ? 1 : -1;
-        return 0;
-      });
-      
-      setCredentials(data);
+      setRawCredentials(res.data);
+      setLastUpdated(new Date());
     } catch (error: any) {
       console.error('Error loading credentials:', error);
       setError(error.response?.data?.message || 'Failed to load credentials');
-      toast.error('Failed to load credentials');
+      if (showLoading) toast.error('Failed to load credentials');
     } finally {
       setLoading(false);
+      setIsRefreshing(false);
     }
-  };
+  }, []);
 
+  // Apply filtering and sorting using useMemo for performance
+  const credentials = useMemo(() => {
+    let data = [...rawCredentials];
+    
+    // Filter by owner if filter is set
+    if (filterOwner && isAdmin) {
+      data = data.filter((cred: any) => 
+        cred.owner?.email?.toLowerCase().includes(filterOwner.toLowerCase()) ||
+        cred.owner?.firstName?.toLowerCase().includes(filterOwner.toLowerCase()) ||
+        cred.owner?.lastName?.toLowerCase().includes(filterOwner.toLowerCase())
+      );
+    }
+    
+    // Client-side sorting
+    data.sort((a, b) => {
+      let aVal: any, bVal: any;
+      switch (sortBy) {
+        case 'name':
+          aVal = a.name?.toLowerCase() || '';
+          bVal = b.name?.toLowerCase() || '';
+          break;
+        case 'createdAt':
+          aVal = new Date(a.createdAt).getTime();
+          bVal = new Date(b.createdAt).getTime();
+          break;
+        case 'owner':
+          aVal = `${a.owner?.firstName || ''} ${a.owner?.lastName || ''}`.toLowerCase();
+          bVal = `${b.owner?.firstName || ''} ${b.owner?.lastName || ''}`.toLowerCase();
+          break;
+        case 'isPaid':
+          aVal = a.isPaid ? 1 : 0;
+          bVal = b.isPaid ? 1 : 0;
+          break;
+        case 'hasAutopay':
+          aVal = a.hasAutopay ? 1 : 0;
+          bVal = b.hasAutopay ? 1 : 0;
+          break;
+        default:
+          aVal = new Date(a.createdAt).getTime();
+          bVal = new Date(b.createdAt).getTime();
+      }
+      
+      if (aVal < bVal) return sortOrder === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortOrder === 'asc' ? 1 : -1;
+      return 0;
+    });
+    
+    return data;
+  }, [rawCredentials, filterOwner, isAdmin, sortBy, sortOrder]);
+
+  // Initial load
   useEffect(() => {
     loadCredentials();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filterOwner, sortBy, sortOrder]);
+  }, [loadCredentials]);
+
+  // Real-time refresh: every 30 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      loadCredentials(false);
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [loadCredentials]);
+
+  // Refresh on window focus
+  useEffect(() => {
+    const handleFocus = () => loadCredentials(false);
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [loadCredentials]);
+
+  // Refresh on network reconnect
+  useEffect(() => {
+    const handleOnline = () => loadCredentials(false);
+    window.addEventListener('online', handleOnline);
+    return () => window.removeEventListener('online', handleOnline);
+  }, [loadCredentials]);
 
   const handleDelete = async (credentialId: string) => {
     if (!confirm('Are you sure you want to delete this credential? This action cannot be undone.')) {
@@ -155,7 +180,7 @@ export default function CredentialsPage() {
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Failed to Load Credentials</h3>
             <p className="text-sm text-gray-600 mb-4">{error}</p>
             <button
-              onClick={loadCredentials}
+              onClick={() => { loadCredentials(); }}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
             >
               Retry
@@ -169,7 +194,22 @@ export default function CredentialsPage() {
   return (
     <div className="space-y-4 sm:space-y-6 w-full">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Credentials</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Credentials</h1>
+          <button
+            onClick={() => { loadCredentials(false); }}
+            disabled={isRefreshing}
+            className={`p-1.5 rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors ${isRefreshing ? 'animate-spin' : ''}`}
+            title="Refresh data"
+          >
+            <RefreshCw className="h-4 w-4" />
+          </button>
+          {lastUpdated && (
+            <span className="text-xs text-gray-400 hidden sm:inline">
+              Updated {lastUpdated.toLocaleTimeString()}
+            </span>
+          )}
+        </div>
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-2 border border-gray-300 rounded-md bg-white">
