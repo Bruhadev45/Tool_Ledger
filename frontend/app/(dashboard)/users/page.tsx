@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import api from '@/lib/api';
-import { Users, Shield, User, Mail, Edit, Check, X, Plus, Trash2, ArrowUp, ArrowDown, Filter } from 'lucide-react';
+import { Users, Shield, User, Mail, Edit, Check, X, Plus, Trash2, ArrowUp, ArrowDown, Filter, Building2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function UsersPage() {
@@ -308,8 +308,14 @@ export default function UsersPage() {
 
       <div className="bg-white shadow-sm border border-gray-200 rounded-lg overflow-hidden">
         <div className="px-4 py-5 sm:px-6 border-b border-gray-200">
-          <h3 className="text-lg font-medium text-gray-900">Organization Members</h3>
-          <p className="mt-1 text-sm text-gray-500">Manage users in your organization</p>
+          <h3 className="text-lg font-medium text-gray-900">
+            {session?.user?.role === 'ADMIN' ? 'All Users' : 'Organization Members'}
+          </h3>
+          <p className="mt-1 text-sm text-gray-500">
+            {session?.user?.role === 'ADMIN'
+              ? 'Manage all users across all organizations'
+              : 'Manage users in your organization'}
+          </p>
         </div>
         <ul className="divide-y divide-gray-200">
           {users.map((user) => (
@@ -423,7 +429,9 @@ export default function UsersPage() {
         <div className="text-center py-12">
           <Users className="mx-auto h-12 w-12 text-gray-400" />
           <h3 className="mt-2 text-sm font-medium text-gray-900">No users found</h3>
-          <p className="mt-1 text-sm text-gray-500">No users in your organization.</p>
+          <p className="mt-1 text-sm text-gray-500">
+            {session?.user?.role === 'ADMIN' ? 'No users found.' : 'No users in your organization.'}
+          </p>
         </div>
       )}
 
