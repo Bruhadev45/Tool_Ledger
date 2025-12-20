@@ -106,7 +106,6 @@ export default function InvoiceDetailPage() {
           fileUrl = `${apiBaseUrl}${fileUrl.startsWith('/') ? '' : '/'}${fileUrl}`;
         }
         
-        console.log('Opening file URL:', fileUrl);
         window.open(fileUrl, '_blank');
         toast.success('Opening invoice file...');
       } else {

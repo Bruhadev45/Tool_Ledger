@@ -64,4 +64,8 @@ export class CreateInvoiceDto {
   @IsArray()
   @IsUUID(undefined, { each: true })
   credentialIds?: string[];
+
+  @IsOptional()
+  @IsUUID()
+  organizationId?: string; // Optional: allows selecting organization (for admins)
 }

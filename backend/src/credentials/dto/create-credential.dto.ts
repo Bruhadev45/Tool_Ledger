@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsArray, IsBoolean } from 'class-validator';
+import { IsString, IsOptional, IsArray, IsBoolean, IsUUID } from 'class-validator';
 
 export class CreateCredentialDto {
   @IsString()
@@ -30,4 +30,8 @@ export class CreateCredentialDto {
   @IsOptional()
   @IsBoolean()
   hasAutopay?: boolean; // Autopay enabled or not
+
+  @IsOptional()
+  @IsUUID()
+  organizationId?: string; // Optional: allows selecting organization (for admins)
 }

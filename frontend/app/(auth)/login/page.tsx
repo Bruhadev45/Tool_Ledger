@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
 import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
-import { Lock, Mail, Shield, Loader2, Eye, EyeOff, ChevronDown, Users, FileText } from 'lucide-react';
+import { Lock, Mail, Shield, Loader2, Eye, EyeOff } from 'lucide-react';
 import api from '@/lib/api';
 
 export default function LoginPage() {
@@ -15,28 +15,7 @@ export default function LoginPage() {
   const [mfaToken, setMfaToken] = useState('');
   const [requiresMFA, setRequiresMFA] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [showCredentials, setShowCredentials] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [selectedAccount, setSelectedAccount] = useState<string>('');
-  const [showAccountDropdown, setShowAccountDropdown] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setShowAccountDropdown(false);
-      }
-    };
-
-    if (showAccountDropdown) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [showAccountDropdown]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -138,32 +117,10 @@ export default function LoginPage() {
         }
       }
     } catch (error: any) {
-      console.error('Login exception:', error);
-      toast.error(error?.message || 'An error occurred. Make sure the backend server is running.');
+      toast.error(error?.message || 'An error occurred during login. Please try again.');
     } finally {
       setLoading(false);
     }
-  };
-
-  const defaultCredentials = [
-    { email: 'admin@toolledger.com', password: 'password123', role: 'Admin', icon: Shield },
-    { email: 'user1@toolledger.com', password: 'password123', role: 'User 1', icon: Users },
-    { email: 'user2@toolledger.com', password: 'password123', role: 'User 2', icon: Users },
-    { email: 'user3@toolledger.com', password: 'password123', role: 'User 3', icon: Users },
-    { email: 'accountant1@toolledger.com', password: 'password123', role: 'Accountant 1', icon: FileText },
-    { email: 'accountant2@toolledger.com', password: 'password123', role: 'Accountant 2', icon: FileText },
-  ];
-
-  const fillCredentials = (credEmail: string, credPassword: string, role: string) => {
-    setEmail(credEmail);
-    setPassword(credPassword);
-    setSelectedAccount(role);
-    setShowCredentials(false);
-    setShowAccountDropdown(false);
-  };
-
-  const handleAccountSelect = (account: typeof defaultCredentials[0]) => {
-    fillCredentials(account.email, account.password, account.role);
   };
 
   return (
@@ -183,67 +140,6 @@ export default function LoginPage() {
           <h2 className="text-2xl font-semibold text-gray-900 mb-6 text-center">
             Sign in to your account
           </h2>
-
-          {/* Demo Account Selector */}
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Demo Accounts
-            </label>
-            <div className="relative" ref={dropdownRef}>
-              <button
-                type="button"
-                onClick={() => setShowAccountDropdown(!showAccountDropdown)}
-                className="w-full flex items-center justify-between px-4 py-3 border border-gray-300 rounded-lg bg-white hover:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
-              >
-                <div className="flex items-center gap-3">
-                  {selectedAccount ? (
-                    <>
-                      {defaultCredentials.find(c => c.role === selectedAccount)?.icon && (
-                        <div className="flex items-center gap-2">
-                          {(() => {
-                            const Icon = defaultCredentials.find(c => c.role === selectedAccount)!.icon;
-                            return <Icon className="w-4 h-4 text-blue-600" />;
-                          })()}
-                          <span className="text-sm font-medium text-gray-900">
-                            {selectedAccount} - {email}
-                          </span>
-                        </div>
-                      )}
-                    </>
-                  ) : (
-                    <span className="text-sm text-gray-500">Choose a demo account...</span>
-                  )}
-                </div>
-                <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${showAccountDropdown ? 'rotate-180' : ''}`} />
-              </button>
-
-              {showAccountDropdown && (
-                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-80 overflow-y-auto">
-                  {defaultCredentials.map((account, idx) => {
-                    const Icon = account.icon;
-                    return (
-                      <button
-                        key={idx}
-                        type="button"
-                        onClick={() => handleAccountSelect(account)}
-                        className="w-full flex items-center gap-3 px-4 py-3 text-left transition-colors first:rounded-t-lg last:rounded-b-lg hover:bg-blue-50"
-                      >
-                        <div className="flex-shrink-0 text-gray-600">
-                          <Icon className="w-4 h-4" />
-                        </div>
-                        <div className="flex-1">
-                          <p className="text-sm font-medium text-gray-900">
-                            {account.role}
-                          </p>
-                          <p className="text-xs text-gray-500">{account.email}</p>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
 
           <form className="space-y-5" onSubmit={handleSubmit}>
             {/* Email Field */}
@@ -328,8 +224,6 @@ export default function LoginPage() {
                 />
                 <p className="mt-2 text-xs text-gray-500 text-center">
                   Enter the 6-digit code from your authenticator app
-                  <br />
-                  <span className="text-gray-400">(For testing: use 000000)</span>
                 </p>
               </div>
             )}
@@ -367,14 +261,6 @@ export default function LoginPage() {
                 Sign up
               </Link>
             </p>
-            <p className="text-xs text-gray-500">
-              Secure credential management with enterprise-grade security
-            </p>
-            {process.env.NODE_ENV === 'development' && (
-              <p className="text-xs text-blue-600 font-medium">
-                💡 Make sure backend is running on http://localhost:3001
-              </p>
-            )}
           </div>
         </div>
       </div>

@@ -17,6 +17,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { EncryptionService } from '../shared/encryption/encryption.service';
+import { EmailService } from '../email/email.service';
 import { CredentialPermission, UserRole } from '@prisma/client';
 import { CreateCredentialDto, UpdateCredentialDto, ShareCredentialDto } from './dto';
 
@@ -27,6 +28,7 @@ export class CredentialsService {
   constructor(
     private prisma: PrismaService,
     private encryptionService: EncryptionService,
+    private emailService: EmailService,
   ) {}
 
   /**
@@ -37,10 +39,34 @@ export class CredentialsService {
    *
    * @param userId - ID of the user creating the credential (becomes owner)
    * @param organizationId - ID of the organization (multi-tenant isolation)
-   * @param createDto - Credential data (name, username, password, optional API key, notes, tags)
+   * @param userRole - Role of the user (to check if they can select organization)
+   * @param createDto - Credential data (name, username, password, optional API key, notes, tags, organizationId)
    * @returns Created credential object with encrypted fields
    */
-  async create(userId: string, organizationId: string, createDto: CreateCredentialDto) {
+  async create(
+    userId: string,
+    organizationId: string,
+    userRole: UserRole,
+    createDto: CreateCredentialDto,
+  ) {
+    // Use provided organizationId or default to user's organization
+    let targetOrganizationId = organizationId;
+
+    // Only admins can create credentials for other organizations
+    if (createDto.organizationId) {
+      if (userRole !== UserRole.ADMIN) {
+        throw new ForbiddenException('Only admins can create credentials for other organizations');
+      }
+      // Verify the organization exists
+      const org = await this.prisma.organization.findUnique({
+        where: { id: createDto.organizationId },
+      });
+      if (!org) {
+        throw new BadRequestException('Organization not found');
+      }
+      targetOrganizationId = createDto.organizationId;
+    }
+
     // Encrypt all sensitive fields using AES-256 encryption
     const encryptedUsername = this.encryptionService.encrypt(createDto.username);
     const encryptedPassword = this.encryptionService.encrypt(createDto.password);
@@ -59,7 +85,7 @@ export class CredentialsService {
         tags: createDto.tags || [],
         isPaid: createDto.isPaid ?? false,
         hasAutopay: createDto.hasAutopay ?? false,
-        organizationId,
+        organizationId: targetOrganizationId,
         ownerId: userId,
       },
     });
@@ -452,8 +478,18 @@ export class CredentialsService {
         throw new BadRequestException('User not found in your organization');
       }
 
+      // Get the current user (sharer) details
+      const sharer = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          firstName: true,
+          lastName: true,
+          email: true,
+        },
+      });
+
       // Create or update share
-      return this.prisma.credentialShare.upsert({
+      const share = await this.prisma.credentialShare.upsert({
         where: {
           credentialId_userId: {
             credentialId: id,
@@ -470,6 +506,29 @@ export class CredentialsService {
           permission: shareDto.permission,
         },
       });
+
+      // Send email notification to the recipient
+      if (sharer) {
+        const sharerName = `${sharer.firstName} ${sharer.lastName}`;
+        const recipientName = `${targetUser.firstName} ${targetUser.lastName}`;
+        const permissionText =
+          shareDto.permission === CredentialPermission.EDIT ? 'Edit' : 'View Only';
+
+        // Send email asynchronously (don't wait for it)
+        this.emailService
+          .sendCredentialSharedNotification(
+            targetUser.email,
+            recipientName,
+            credential.name,
+            sharerName,
+            permissionText,
+          )
+          .catch((error) => {
+            this.logger.error(`Failed to send email notification: ${error.message}`);
+          });
+      }
+
+      return share;
     }
 
     // Share with team

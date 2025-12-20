@@ -24,7 +24,7 @@ export class CredentialsController {
 
   @Post()
   create(@CurrentUser() user: any, @Body() createDto: CreateCredentialDto) {
-    return this.credentialsService.create(user.id, user.organizationId, createDto);
+    return this.credentialsService.create(user.id, user.organizationId, user.role, createDto);
   }
 
   @Get()

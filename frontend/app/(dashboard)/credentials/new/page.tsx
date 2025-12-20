@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import api from '@/lib/api';
 import { Key, ArrowLeft, Sparkles } from 'lucide-react';
 import Link from 'next/link';
@@ -9,7 +10,13 @@ import toast from 'react-hot-toast';
 
 export default function NewCredentialPage() {
   const router = useRouter();
+  const { data: session } = useSession();
+  const userRole = (session?.user as any)?.role;
+  const userOrganizationId = (session?.user as any)?.organizationId;
+  const isAdmin = userRole === 'ADMIN';
+  
   const [loading, setLoading] = useState(false);
+  const [organizations, setOrganizations] = useState<any[]>([]);
   const [formData, setFormData] = useState({
     name: '',
     username: '',
@@ -19,8 +26,32 @@ export default function NewCredentialPage() {
     tags: '',
     isPaid: false,
     hasAutopay: false,
+    organizationId: '',
   });
   const [showTemplates, setShowTemplates] = useState(false);
+
+  useEffect(() => {
+    if (isAdmin) {
+      loadOrganizations();
+    }
+  }, [isAdmin]);
+
+  const loadOrganizations = async () => {
+    try {
+      const res = await api.get('/organizations');
+      setOrganizations(res.data || []);
+      // Set default to user's organization
+      if (userOrganizationId && res.data) {
+        const defaultOrg = res.data.find((org: any) => org.id === userOrganizationId);
+        if (defaultOrg) {
+          setFormData((prev) => ({ ...prev, organizationId: defaultOrg.id }));
+        }
+      }
+    } catch (error: any) {
+      console.error('Error loading organizations:', error);
+      // Don't show error toast, just silently fail
+    }
+  };
 
   const templates = [
     {
@@ -91,6 +122,7 @@ export default function NewCredentialPage() {
         tags: tagsArray,
         isPaid: formData.isPaid,
         hasAutopay: formData.hasAutopay,
+        organizationId: isAdmin && formData.organizationId ? formData.organizationId : undefined,
       });
 
       toast.success('Credential created successfully');
@@ -148,6 +180,30 @@ export default function NewCredentialPage() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {isAdmin && organizations.length > 0 && (
+            <div>
+              <label htmlFor="organizationId" className="block text-sm font-medium text-gray-700 mb-2">
+                Organization
+              </label>
+              <select
+                id="organizationId"
+                value={formData.organizationId}
+                onChange={(e) => setFormData({ ...formData, organizationId: e.target.value })}
+                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+              >
+                <option value="">Select Organization (defaults to your organization)</option>
+                {organizations.map((org) => (
+                  <option key={org.id} value={org.id}>
+                    {org.name} ({org.domain})
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-gray-500">
+                Select an organization for this credential. If not selected, it will be created in your organization.
+              </p>
+            </div>
+          )}
+
           <div>
             <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
               Name <span className="text-red-500">*</span>

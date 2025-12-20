@@ -47,15 +47,18 @@ ToolLedger is a comprehensive enterprise-grade platform designed to help organiz
 ### Credential Management
 - ✅ Secure credential storage with AES-256 encryption
 - ✅ Credential sharing with granular permissions (VIEW_ONLY, EDIT, NO_ACCESS)
+- ✅ Email notifications when credentials are shared
 - ✅ Team-based credential sharing
 - ✅ Credential-invoice linking for expense tracking
 - ✅ Tag-based organization and search
+- ✅ Organization selection for credential creation (Admin only)
 
 ### Invoice Management
 - ✅ PDF invoice upload and storage
 - ✅ AI-powered invoice parsing (OCR + OpenAI)
 - ✅ Approval workflow (Admin approval required)
 - ✅ Invoice-credential bidirectional linking
+- ✅ Organization selection for invoice creation (Admin only)
 - ✅ Category-based organization
 - ✅ Multi-currency support (USD)
 
@@ -282,6 +285,11 @@ S3_BUCKET_NAME=your-bucket-name
 
 # OpenAI (optional, for AI invoice parsing)
 OPENAI_API_KEY=your-openai-api-key
+
+# Gmail SMTP (for email notifications)
+SMTP_USER=your-email@gmail.com
+SMTP_PASSWORD=your-gmail-app-password
+SMTP_FROM=your-email@gmail.com
 
 # Environment
 NODE_ENV=development

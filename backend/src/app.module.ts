@@ -24,6 +24,7 @@ import { AuditLogModule } from './audit-log/audit-log.module';
 import { AiAssistantModule } from './ai-assistant/ai-assistant.module';
 import { TeamsModule } from './teams/teams.module';
 import { EncryptionModule } from './shared/encryption/encryption.module';
+import { EmailModule } from './email/email.module';
 import { AppController } from './app.controller';
 
 @Module({
@@ -57,6 +58,7 @@ import { AppController } from './app.controller';
     AuditLogModule, // Audit trail logging
     AiAssistantModule, // AI-powered invoice parsing and insights
     TeamsModule, // Team management for credential sharing
+    EmailModule, // Email notification service
   ],
 })
 export class AppModule {}

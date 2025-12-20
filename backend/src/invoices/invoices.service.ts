@@ -35,7 +35,8 @@ export class InvoicesService {
    *
    * @param userId - ID of the user creating the invoice
    * @param organizationId - ID of the organization (multi-tenant isolation)
-   * @param createDto - Invoice data (number, amount, provider, dates, category, credential IDs)
+   * @param userRole - Role of the user (to check if they can select organization)
+   * @param createDto - Invoice data (number, amount, provider, dates, category, credential IDs, organizationId)
    * @param file - Optional PDF file to upload
    * @returns Created invoice object with file information
    * @throws BadRequestException if validation fails or file upload fails
@@ -43,9 +44,28 @@ export class InvoicesService {
   async create(
     userId: string,
     organizationId: string,
+    userRole: UserRole,
     createDto: CreateInvoiceDto,
     file?: Express.Multer.File,
   ) {
+    // Use provided organizationId or default to user's organization
+    let targetOrganizationId = organizationId;
+
+    // Only admins can create invoices for other organizations
+    if (createDto.organizationId) {
+      if (userRole !== UserRole.ADMIN) {
+        throw new ForbiddenException('Only admins can create invoices for other organizations');
+      }
+      // Verify the organization exists
+      const org = await this.prisma.organization.findUnique({
+        where: { id: createDto.organizationId },
+      });
+      if (!org) {
+        throw new BadRequestException('Organization not found');
+      }
+      targetOrganizationId = createDto.organizationId;
+    }
+
     let fileUrl: string | null = null;
     let fileName: string | null = null;
     let fileSize: number | null = null;
@@ -56,7 +76,7 @@ export class InvoicesService {
         // Upload to storage service (S3 or local storage)
         const uploadResult = await this.storageService.uploadFile(
           file,
-          `invoices/${organizationId}`, // Organize by organization ID
+          `invoices/${targetOrganizationId}`, // Organize by organization ID
         );
 
         fileUrl = uploadResult.url;
@@ -108,7 +128,7 @@ export class InvoicesService {
       fileUrl,
       fileName,
       fileSize,
-      organizationId,
+      organizationId: targetOrganizationId,
       uploadedById: userId,
       status: InvoiceStatus.PENDING, // New invoices start as pending (require admin approval)
       // Create links to associated credentials if provided

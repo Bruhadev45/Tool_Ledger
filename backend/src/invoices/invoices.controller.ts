@@ -35,7 +35,7 @@ export class InvoicesController {
     @Body() createDto: CreateInvoiceDto,
     @UploadedFile() file?: Express.Multer.File,
   ) {
-    return this.invoicesService.create(user.id, user.organizationId, createDto, file);
+    return this.invoicesService.create(user.id, user.organizationId, user.role, createDto, file);
   }
 
   @Get()

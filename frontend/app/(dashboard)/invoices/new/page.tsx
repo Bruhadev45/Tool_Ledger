@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import api from '@/lib/api';
 import { FileText, ArrowLeft, Upload, Sparkles, Loader2, Key } from 'lucide-react';
 import Link from 'next/link';
@@ -9,7 +10,13 @@ import toast from 'react-hot-toast';
 
 export default function NewInvoicePage() {
   const router = useRouter();
+  const { data: session } = useSession();
+  const userRole = (session?.user as any)?.role;
+  const userOrganizationId = (session?.user as any)?.organizationId;
+  const isAdmin = userRole === 'ADMIN';
+  
   const [loading, setLoading] = useState(false);
+  const [organizations, setOrganizations] = useState<any[]>([]);
   const [formData, setFormData] = useState({
     invoiceNumber: '',
     amount: '',
@@ -18,6 +25,7 @@ export default function NewInvoicePage() {
     billingDate: '',
     dueDate: '',
     category: '',
+    organizationId: '',
   });
   const [file, setFile] = useState<File | null>(null);
   const [parsing, setParsing] = useState(false);
@@ -27,7 +35,27 @@ export default function NewInvoicePage() {
 
   useEffect(() => {
     loadCredentials();
-  }, []);
+    if (isAdmin) {
+      loadOrganizations();
+    }
+  }, [isAdmin]);
+
+  const loadOrganizations = async () => {
+    try {
+      const res = await api.get('/organizations');
+      setOrganizations(res.data || []);
+      // Set default to user's organization
+      if (userOrganizationId && res.data) {
+        const defaultOrg = res.data.find((org: any) => org.id === userOrganizationId);
+        if (defaultOrg) {
+          setFormData((prev) => ({ ...prev, organizationId: defaultOrg.id }));
+        }
+      }
+    } catch (error: any) {
+      console.error('Error loading organizations:', error);
+      // Don't show error toast, just silently fail
+    }
+  };
 
   const loadCredentials = async () => {
     try {
@@ -307,6 +335,11 @@ export default function NewInvoicePage() {
         formDataToSend.append('category', formData.category.trim());
       }
       
+      // Add organization ID if admin selected one
+      if (isAdmin && formData.organizationId) {
+        formDataToSend.append('organizationId', formData.organizationId);
+      }
+      
       // Add credential IDs if selected
       if (selectedCredentialIds.length > 0) {
         // Backend expects credentialIds as an array
@@ -378,6 +411,30 @@ export default function NewInvoicePage() {
 
       <div className="bg-white shadow-sm border border-gray-200 rounded-lg p-6 max-w-2xl">
         <form onSubmit={handleSubmit} className="space-y-6">
+          {isAdmin && organizations.length > 0 && (
+            <div>
+              <label htmlFor="organizationId" className="block text-sm font-medium text-gray-700 mb-2">
+                Organization
+              </label>
+              <select
+                id="organizationId"
+                value={formData.organizationId}
+                onChange={(e) => setFormData({ ...formData, organizationId: e.target.value })}
+                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+              >
+                <option value="">Select Organization (defaults to your organization)</option>
+                {organizations.map((org) => (
+                  <option key={org.id} value={org.id}>
+                    {org.name} ({org.domain})
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-gray-500">
+                Select an organization for this invoice. If not selected, it will be created in your organization.
+              </p>
+            </div>
+          )}
+
           <div>
             <label htmlFor="invoiceNumber" className="block text-sm font-medium text-gray-700 mb-2">
               Invoice Number <span className="text-red-500">*</span>

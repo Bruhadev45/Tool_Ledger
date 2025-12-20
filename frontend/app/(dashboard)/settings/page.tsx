@@ -399,8 +399,7 @@ export default function SettingsPage() {
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Enter 6-digit code from your authenticator app:
-                        <span className="text-xs text-gray-400 ml-2">(For testing: use 000000)</span>
+                        Enter 6-digit code from your authenticator app
                       </label>
                       <input
                         type="text"
