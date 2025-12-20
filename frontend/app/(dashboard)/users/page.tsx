@@ -343,6 +343,12 @@ export default function UsersPage() {
                         <p className="text-xs text-gray-500">{user.team.name}</p>
                       </div>
                     )}
+                    {user.organization && (
+                      <div className="flex items-center gap-2 mt-1">
+                        <Building2 className="h-3 w-3 text-gray-400" />
+                        <p className="text-xs text-gray-500">{user.organization.name}</p>
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="flex items-center gap-4">

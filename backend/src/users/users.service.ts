@@ -39,8 +39,13 @@ export class UsersService {
       throw new ForbiddenException('Only admins and accountants can list users');
     }
 
+    // Admins can see all users across all organizations
+    // Accountants can only see users in their own organization
+    const whereClause =
+      requesterRole === UserRole.ADMIN ? {} : { organizationId };
+
     return this.prisma.user.findMany({
-      where: { organizationId },
+      where: whereClause,
       select: {
         id: true,
         email: true,
@@ -50,6 +55,14 @@ export class UsersService {
         isActive: true,
         createdAt: true,
         lastLoginAt: true,
+        organizationId: true, // Include organizationId so frontend can show which org
+        organization: {
+          select: {
+            id: true,
+            name: true,
+            domain: true,
+          },
+        },
         team: {
           select: {
             id: true,
