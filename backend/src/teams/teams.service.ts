@@ -202,8 +202,15 @@ export class TeamsService {
       throw new ForbiddenException('Only admins and accountants can delete teams');
     }
 
+    // Admins can delete teams from any organization
+    // Accountants can only delete teams from their own organization
+    const whereClause: any = { id };
+    if (requesterRole !== UserRole.ADMIN) {
+      whereClause.organizationId = organizationId;
+    }
+
     const team = await this.prisma.team.findFirst({
-      where: { id, organizationId },
+      where: whereClause,
     });
 
     if (!team) {

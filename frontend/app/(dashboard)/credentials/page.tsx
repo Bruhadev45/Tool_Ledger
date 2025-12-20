@@ -99,7 +99,7 @@ export default function CredentialsPage() {
     try {
       await api.delete(`/credentials/${credentialId}`);
       toast.success('Credential deleted successfully');
-      loadCredentials();
+      await loadCredentials();
     } catch (error: any) {
       console.error('Delete failed:', error);
       toast.error(error.response?.data?.message || 'Failed to delete credential');

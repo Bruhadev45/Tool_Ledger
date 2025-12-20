@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -99,6 +99,30 @@ export class StorageService {
         return `/files/${key}`;
       }
       throw new Error(`File not found: ${key}`);
+    }
+  }
+
+  /**
+   * Delete a file from storage
+   *
+   * Removes a file from S3 or local storage.
+   *
+   * @param key - The file key/path to delete
+   */
+  async deleteFile(key: string): Promise<void> {
+    if (this.useS3) {
+      const command = new DeleteObjectCommand({
+        Bucket: this.bucketName,
+        Key: key,
+      });
+
+      await this.s3Client.send(command);
+    } else {
+      // Local file deletion
+      const filePath = path.join(this.localStoragePath, key);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
     }
   }
 }

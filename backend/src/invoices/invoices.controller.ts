@@ -6,6 +6,7 @@ import {
   Patch,
   Param,
   Query,
+  Delete,
   UseGuards,
   UseInterceptors,
   UploadedFile,
@@ -100,5 +101,10 @@ export class InvoicesController {
   @Roles(UserRole.ADMIN)
   reject(@Param('id') id: string, @CurrentUser() user: any, @Body() body: { reason: string }) {
     return this.invoicesService.reject(id, user.id, user.organizationId, body.reason);
+  }
+
+  @Delete(':id')
+  remove(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.invoicesService.remove(id, user.id, user.organizationId, user.role);
   }
 }

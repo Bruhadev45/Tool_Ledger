@@ -428,4 +428,58 @@ export class InvoicesService {
       data: updateData,
     });
   }
+
+  /**
+   * Delete an invoice
+   *
+   * Permanently removes an invoice. Only the uploader or admin can delete.
+   * Admins can delete invoices from any organization.
+   *
+   * @param id - Invoice ID
+   * @param userId - ID of the user requesting deletion
+   * @param organizationId - ID of the organization (multi-tenant isolation)
+   * @param userRole - Role of the user
+   * @returns Success message
+   * @throws NotFoundException if invoice not found
+   * @throws ForbiddenException if user doesn't have permission
+   */
+  async remove(id: string, userId: string, organizationId: string, userRole: UserRole) {
+    // Admins can delete invoices from any organization
+    const whereClause: any = { id };
+    if (userRole !== UserRole.ADMIN) {
+      whereClause.organizationId = organizationId;
+    }
+
+    const invoice = await this.prisma.invoice.findFirst({
+      where: whereClause,
+    });
+
+    if (!invoice) {
+      throw new NotFoundException('Invoice not found');
+    }
+
+    // Only uploader or admin can delete
+    const isUploader = invoice.uploadedById === userId;
+    const isAdmin = userRole === UserRole.ADMIN;
+
+    if (!isUploader && !isAdmin) {
+      throw new ForbiddenException('You do not have permission to delete this invoice');
+    }
+
+    // Delete the file from storage if it exists
+    if (invoice.fileUrl) {
+      try {
+        await this.storageService.deleteFile(invoice.fileUrl);
+      } catch (error) {
+        // Log but don't fail - file might already be deleted
+        console.error('Failed to delete invoice file:', error);
+      }
+    }
+
+    await this.prisma.invoice.delete({
+      where: { id },
+    });
+
+    return { message: 'Invoice deleted successfully' };
+  }
 }

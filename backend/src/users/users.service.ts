@@ -330,9 +330,16 @@ export class UsersService {
       throw new ForbiddenException('Only admins and accountants can delete users');
     }
 
-    // Verify user exists in organization
+    // Admins can delete users from any organization
+    // Accountants can only delete users from their own organization
+    const whereClause: any = { id: userId };
+    if (requesterRole !== UserRole.ADMIN) {
+      whereClause.organizationId = organizationId;
+    }
+
+    // Verify user exists
     const user = await this.prisma.user.findFirst({
-      where: { id: userId, organizationId },
+      where: whereClause,
     });
 
     if (!user) {

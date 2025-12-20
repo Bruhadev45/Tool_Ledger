@@ -180,7 +180,7 @@ export default function UsersPage() {
     try {
       await api.delete(`/users/${userId}`);
       toast.success('User deleted successfully');
-      loadUsers();
+      await loadUsers();
     } catch (error: any) {
       console.error('Delete failed:', error);
       toast.error(error.response?.data?.message || 'Failed to delete user');
@@ -309,10 +309,10 @@ export default function UsersPage() {
       <div className="bg-white shadow-sm border border-gray-200 rounded-lg overflow-hidden">
         <div className="px-4 py-5 sm:px-6 border-b border-gray-200">
           <h3 className="text-lg font-medium text-gray-900">
-            {session?.user?.role === 'ADMIN' ? 'All Users' : 'Organization Members'}
+            {(session?.user as any)?.role === 'ADMIN' ? 'All Users' : 'Organization Members'}
           </h3>
           <p className="mt-1 text-sm text-gray-500">
-            {session?.user?.role === 'ADMIN'
+            {(session?.user as any)?.role === 'ADMIN'
               ? 'Manage all users across all organizations'
               : 'Manage users in your organization'}
           </p>
@@ -430,7 +430,7 @@ export default function UsersPage() {
           <Users className="mx-auto h-12 w-12 text-gray-400" />
           <h3 className="mt-2 text-sm font-medium text-gray-900">No users found</h3>
           <p className="mt-1 text-sm text-gray-500">
-            {session?.user?.role === 'ADMIN' ? 'No users found.' : 'No users in your organization.'}
+            {(session?.user as any)?.role === 'ADMIN' ? 'No users found.' : 'No users in your organization.'}
           </p>
         </div>
       )}

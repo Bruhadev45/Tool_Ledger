@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import api from '@/lib/api';
-import { FileText, Plus, Download, Check, X, Filter, Eye, Tag, MessageSquare, ArrowUpDown, ArrowUp, ArrowDown, Search } from 'lucide-react';
+import { FileText, Plus, Download, Check, X, Filter, Eye, Tag, MessageSquare, ArrowUpDown, ArrowUp, ArrowDown, Search, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import toast from 'react-hot-toast';
@@ -173,6 +173,21 @@ export default function InvoicesPage() {
   const openCommentModal = (invoiceId: string) => {
     setSelectedInvoice(invoiceId);
     setShowCommentModal(true);
+  };
+
+  const handleDelete = async (invoiceId: string, invoiceNumber: string) => {
+    if (!confirm(`Are you sure you want to delete invoice "${invoiceNumber}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      await api.delete(`/invoices/${invoiceId}`);
+      toast.success('Invoice deleted successfully');
+      await loadInvoices();
+    } catch (error: any) {
+      console.error('Delete failed:', error);
+      toast.error(error.response?.data?.message || 'Failed to delete invoice');
+    }
   };
 
   if (loading) {
@@ -450,6 +465,15 @@ export default function InvoicesPage() {
                       >
                         <Eye className="h-4 w-4 sm:h-5 sm:w-5" />
                       </Link>
+                      {(isAdmin || invoice.uploadedBy?.id === (session?.user as any)?.id) && (
+                        <button
+                          onClick={() => handleDelete(invoice.id, invoice.invoiceNumber)}
+                          className="text-red-600 hover:text-red-700 p-1.5 sm:p-1 rounded-md hover:bg-red-50 transition-colors"
+                          title="Delete invoice"
+                        >
+                          <Trash2 className="h-4 w-4 sm:h-5 sm:w-5" />
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
