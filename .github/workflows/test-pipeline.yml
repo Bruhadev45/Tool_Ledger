@@ -1,0 +1,177 @@
+name: Test Pipeline
+
+on:
+  push:
+    branches: [ main, develop, master ]
+  pull_request:
+    branches: [ main, develop, master ]
+
+jobs:
+  lint-and-test:
+    name: Lint and Test
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Wait for PostgreSQL
+        run: |
+          until pg_isready -h localhost -p 5432; do
+            echo "Waiting for PostgreSQL..."
+            sleep 2
+          done
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: |
+          echo "Installing backend dependencies..."
+          npm install --no-package-lock
+          
+      - name: Generate Prisma Client
+        working-directory: backend
+        run: npx prisma generate
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/test
+
+      - name: Run Database Migrations
+        working-directory: backend
+        run: npx prisma migrate deploy
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/test
+
+      - name: Lint Backend
+        working-directory: backend
+        run: npm run lint
+
+      - name: Run Unit Tests
+        working-directory: backend
+        run: npm run test
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/test
+          JWT_SECRET: test-secret-key-for-ci-build-only-min-32-chars
+          JWT_REFRESH_SECRET: test-refresh-secret-key-for-ci-build-only-min-32-chars
+          ENCRYPTION_KEY: v8N3Zp9W4rK2mL6bQx5Yt7G1vS0uJ9n4
+          NODE_ENV: test
+
+      - name: Run E2E Tests
+        working-directory: backend
+        run: npm run test:e2e
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/test
+          JWT_SECRET: test-secret-key-for-ci-build-only-min-32-chars
+          JWT_REFRESH_SECRET: test-refresh-secret-key-for-ci-build-only-min-32-chars
+          ENCRYPTION_KEY: v8N3Zp9W4rK2mL6bQx5Yt7G1vS0uJ9n4
+          NODE_ENV: test
+
+      - name: Build Backend
+        working-directory: backend
+        run: npm run build
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/test
+          JWT_SECRET: test-secret-key-for-ci-build-only-min-32-chars
+          JWT_REFRESH_SECRET: test-refresh-secret-key-for-ci-build-only-min-32-chars
+          ENCRYPTION_KEY: v8N3Zp9W4rK2mL6bQx5Yt7G1vS0uJ9n4
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: |
+          echo "Installing frontend dependencies..."
+          npm install --no-package-lock
+
+      - name: Lint Frontend
+        working-directory: frontend
+        run: npm run lint
+
+      - name: Build Frontend
+        working-directory: frontend
+        run: npm run build
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:3001/api
+          NEXTAUTH_URL: http://localhost:3000
+          NEXTAUTH_SECRET: test-nextauth-secret-for-ci-build-only-min-32-chars
+
+  integration-test:
+    name: Integration Test
+    needs: lint-and-test
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Wait for PostgreSQL
+        run: |
+          until pg_isready -h localhost -p 5432; do
+            echo "Waiting for PostgreSQL..."
+            sleep 2
+          done
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm install --no-package-lock
+
+      - name: Generate Prisma Client and Run Migrations
+        working-directory: backend
+        run: |
+          npx prisma generate
+          npx prisma migrate deploy
+          npx prisma db seed
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/test
+
+      - name: Build and Start Backend
+        working-directory: backend
+        run: |
+          npm run build
+          npm run start:prod &
+          sleep 10
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/test
+          JWT_SECRET: test-secret-key-for-ci-build-only-min-32-chars
+          JWT_REFRESH_SECRET: test-refresh-secret-key-for-ci-build-only-min-32-chars
+          ENCRYPTION_KEY: v8N3Zp9W4rK2mL6bQx5Yt7G1vS0uJ9n4
+          PORT: 3001
+
+      - name: Run Integration Tests
+        run: |
+          chmod +x test-website.sh
+          ./test-website.sh
