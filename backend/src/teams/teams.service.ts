@@ -33,16 +33,8 @@ export class TeamsService {
    * @returns Array of team objects with member counts
    */
   async findAll(organizationId: string, userRole?: UserRole) {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/d0e87589-8be3-4aa2-ae2a-598c75190c1d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'teams.service.ts:findAll:entry',message:'findAll called',data:{organizationId,userRole},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'F'})}).catch(()=>{});
-    // #endregion
-
     // Admins can see all teams across all organizations
     const whereClause = userRole === UserRole.ADMIN ? {} : { organizationId };
-
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/d0e87589-8be3-4aa2-ae2a-598c75190c1d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'teams.service.ts:findAll:whereClause',message:'whereClause built',data:{whereClause,isAdmin:userRole===UserRole.ADMIN},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'F'})}).catch(()=>{});
-    // #endregion
 
     return this.prisma.team.findMany({
       where: whereClause,
@@ -65,17 +57,24 @@ export class TeamsService {
   /**
    * Get a single team by ID
    *
-   * Returns team details including all members. Enforces multi-tenant
-   * isolation by verifying team belongs to organization.
+   * Returns team details including all members. Admins can view teams
+   * from any organization.
    *
    * @param id - Team ID
    * @param organizationId - ID of the organization (multi-tenant isolation)
+   * @param userRole - Role of the user requesting team details
    * @returns Team object with members and member count
    * @throws NotFoundException if team not found or not in organization
    */
-  async findOne(id: string, organizationId: string) {
+  async findOne(id: string, organizationId: string, userRole?: UserRole) {
+    // Admins can view teams from any organization
+    const whereClause: any = { id };
+    if (userRole !== UserRole.ADMIN) {
+      whereClause.organizationId = organizationId;
+    }
+
     const team = await this.prisma.team.findFirst({
-      where: { id, organizationId }, // Multi-tenant isolation
+      where: whereClause,
       include: {
         users: {
           select: {
@@ -89,6 +88,13 @@ export class TeamsService {
         },
         _count: {
           select: { users: true },
+        },
+        organization: {
+          select: {
+            id: true,
+            name: true,
+            domain: true,
+          },
         },
       },
     });

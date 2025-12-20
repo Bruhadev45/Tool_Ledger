@@ -18,7 +18,7 @@ export class TeamsController {
 
   @Get(':id')
   findOne(@Param('id') id: string, @CurrentUser() user: any) {
-    return this.teamsService.findOne(id, user.organizationId);
+    return this.teamsService.findOne(id, user.organizationId, user.role);
   }
 
   @Post()

@@ -302,6 +302,11 @@ export default function TeamsPage() {
                   {team.description && (
                     <p className="text-sm text-gray-500 mt-1">{team.description}</p>
                   )}
+                  {team.organization && (
+                    <p className="text-xs text-gray-400 mt-1">
+                      {team.organization.name}
+                    </p>
+                  )}
                 </div>
                 {canManage && (
                   <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
