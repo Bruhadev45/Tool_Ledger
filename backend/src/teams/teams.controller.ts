@@ -13,7 +13,7 @@ export class TeamsController {
 
   @Get()
   findAll(@CurrentUser() user: any) {
-    return this.teamsService.findAll(user.organizationId);
+    return this.teamsService.findAll(user.organizationId, user.role);
   }
 
   @Get(':id')

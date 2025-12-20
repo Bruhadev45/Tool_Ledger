@@ -22,20 +22,40 @@ export class TeamsService {
   constructor(private prisma: PrismaService) {}
 
   /**
-   * Get all teams in an organization
+   * Get all teams in an organization (or all teams for admins)
    *
    * Returns list of teams with member counts. Used for team selection
-   * in credential sharing and user management.
+   * in credential sharing and user management. Admins can see all teams
+   * across all organizations.
    *
    * @param organizationId - ID of the organization (multi-tenant isolation)
+   * @param userRole - Role of the user requesting teams
    * @returns Array of team objects with member counts
    */
-  async findAll(organizationId: string) {
+  async findAll(organizationId: string, userRole?: UserRole) {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/d0e87589-8be3-4aa2-ae2a-598c75190c1d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'teams.service.ts:findAll:entry',message:'findAll called',data:{organizationId,userRole},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'F'})}).catch(()=>{});
+    // #endregion
+
+    // Admins can see all teams across all organizations
+    const whereClause = userRole === UserRole.ADMIN ? {} : { organizationId };
+
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/d0e87589-8be3-4aa2-ae2a-598c75190c1d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'teams.service.ts:findAll:whereClause',message:'whereClause built',data:{whereClause,isAdmin:userRole===UserRole.ADMIN},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'F'})}).catch(()=>{});
+    // #endregion
+
     return this.prisma.team.findMany({
-      where: { organizationId },
+      where: whereClause,
       include: {
         _count: {
           select: { users: true }, // Include member count
+        },
+        organization: {
+          select: {
+            id: true,
+            name: true,
+            domain: true,
+          },
         },
       },
       orderBy: { name: 'asc' },
