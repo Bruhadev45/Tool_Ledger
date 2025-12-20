@@ -175,8 +175,11 @@ export default function OrganizationsPage() {
       toast.success('User added to organization successfully');
       setShowAddUserModal(false);
       setSelectedUserId('');
-      loadOrganizationDetails(selectedOrg);
-      loadOrganizations(); // Refresh organization stats
+      // Refresh both organization details and the main list
+      await Promise.all([
+        loadOrganizationDetails(selectedOrg),
+        loadOrganizations(), // Refresh organization stats
+      ]);
     } catch (error: any) {
       console.error('Error adding user:', error);
       toast.error(error.response?.data?.message || 'Failed to add user to organization');
@@ -193,8 +196,11 @@ export default function OrganizationsPage() {
     try {
       await api.delete(`/organizations/${selectedOrg}/users/${userId}`);
       toast.success('User removed from organization successfully');
-      loadOrganizationDetails(selectedOrg);
-      loadOrganizations(); // Refresh organization stats
+      // Refresh both organization details and the main list
+      await Promise.all([
+        loadOrganizationDetails(selectedOrg),
+        loadOrganizations(), // Refresh organization stats
+      ]);
     } catch (error: any) {
       console.error('Error removing user:', error);
       toast.error(error.response?.data?.message || 'Failed to remove user from organization');
@@ -209,8 +215,11 @@ export default function OrganizationsPage() {
       toast.success('Credential added to organization successfully');
       setShowAddCredentialModal(false);
       setSelectedCredentialId('');
-      loadOrganizationDetails(selectedOrg);
-      loadOrganizations(); // Refresh organization stats
+      // Refresh both organization details and the main list
+      await Promise.all([
+        loadOrganizationDetails(selectedOrg),
+        loadOrganizations(), // Refresh organization stats
+      ]);
     } catch (error: any) {
       console.error('Error adding credential:', error);
       toast.error(error.response?.data?.message || 'Failed to add credential to organization');
