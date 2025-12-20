@@ -56,39 +56,9 @@ async function main() {
 
   console.log('✅ Organization created:', organization.name);
 
-  // Clean up any extra admin users before seeding (keep only admin@toolledger.com)
-  console.log('\n🧹 Cleaning up extra admin users...');
-  const allAdmins = await prisma.user.findMany({
-    where: { role: UserRole.ADMIN },
-  });
-  
-  const mainAdmin = allAdmins.find(admin => admin.email === 'admin@toolledger.com');
-  const extraAdmins = allAdmins.filter(admin => admin.email !== 'admin@toolledger.com');
-  
-  if (extraAdmins.length > 0) {
-    console.log(`   Found ${extraAdmins.length} extra admin(s) to remove`);
-    for (const admin of extraAdmins) {
-      // Reassign data to main admin if exists, otherwise delete
-      if (mainAdmin) {
-        await prisma.invoice.updateMany({
-          where: { approvedById: admin.id },
-          data: { approvedById: mainAdmin.id },
-        });
-        await prisma.invoice.updateMany({
-          where: { uploadedById: admin.id },
-          data: { uploadedById: mainAdmin.id },
-        });
-        await prisma.credential.updateMany({
-          where: { ownerId: admin.id },
-          data: { ownerId: mainAdmin.id },
-        });
-      }
-      await prisma.user.delete({ where: { id: admin.id } });
-      console.log(`   ✅ Removed: ${admin.email}`);
-    }
-  } else {
-    console.log('   ✅ No extra admins found');
-  }
+  // Skip cleanup of extra admin users - just upsert the main admin
+  // This avoids foreign key constraint issues with existing data
+  console.log('\n🧹 Skipping admin cleanup to preserve existing data...');
 
   // Hash password for all users
   const hashedPassword = await bcrypt.hash('password123', 10);
@@ -467,53 +437,68 @@ async function main() {
     },
   ];
 
-  const credentials = [];
-  for (const cred of credentialData) {
-    const encryptedUsername = encryptionKey ? encrypt(cred.username, encryptionKey) : cred.username;
-    const encryptedPassword = encryptionKey ? encrypt(cred.password, encryptionKey) : cred.password;
-    const encryptedApiKey = cred.apiKey && encryptionKey ? encrypt(cred.apiKey, encryptionKey) : cred.apiKey;
-    const encryptedNotes = cred.notes && encryptionKey ? encrypt(cred.notes, encryptionKey) : cred.notes;
+  // Check if credentials already exist
+  const existingCredentials = await prisma.credential.findMany({
+    where: { organizationId: organization.id },
+  });
 
-    const created = await prisma.credential.create({
+  const credentials = [];
+  if (existingCredentials.length > 0) {
+    console.log(`   ⏩ Skipping - ${existingCredentials.length} credentials already exist`);
+    credentials.push(...existingCredentials);
+  } else {
+    for (const cred of credentialData) {
+      const encryptedUsername = encryptionKey ? encrypt(cred.username, encryptionKey) : cred.username;
+      const encryptedPassword = encryptionKey ? encrypt(cred.password, encryptionKey) : cred.password;
+      const encryptedApiKey = cred.apiKey && encryptionKey ? encrypt(cred.apiKey, encryptionKey) : cred.apiKey;
+      const encryptedNotes = cred.notes && encryptionKey ? encrypt(cred.notes, encryptionKey) : cred.notes;
+
+      const created = await prisma.credential.create({
+        data: {
+          name: cred.name,
+          username: encryptedUsername,
+          password: encryptedPassword,
+          apiKey: encryptedApiKey,
+          notes: encryptedNotes,
+          tags: cred.tags,
+          organizationId: organization.id,
+          ownerId: cred.owner.id,
+        },
+      });
+      credentials.push(created);
+    }
+    console.log(`✅ Created ${credentials.length} credentials`);
+  }
+
+  // Create credential shares (skip if they already exist)
+  console.log('\n🔗 Creating credential shares...');
+  const existingShares = await prisma.credentialShare.count();
+  if (existingShares > 0) {
+    console.log(`   ⏩ Skipping - ${existingShares} credential shares already exist`);
+  } else if (credentials.length >= 3) {
+    await prisma.credentialShare.create({
       data: {
-        name: cred.name,
-        username: encryptedUsername,
-        password: encryptedPassword,
-        apiKey: encryptedApiKey,
-        notes: encryptedNotes,
-        tags: cred.tags,
-        organizationId: organization.id,
-        ownerId: cred.owner.id,
+        credentialId: credentials[0].id, // ChatGPT
+        userId: user1.id,
+        permission: CredentialPermission.VIEW_ONLY,
       },
     });
-    credentials.push(created);
+    await prisma.credentialShare.create({
+      data: {
+        credentialId: credentials[1].id, // Orchids
+        userId: admin1.id,
+        permission: CredentialPermission.EDIT,
+      },
+    });
+    await prisma.credentialShare.create({
+      data: {
+        credentialId: credentials[2].id, // Cursor
+        userId: user1.id,
+        permission: CredentialPermission.VIEW_ONLY,
+      },
+    });
+    console.log('✅ Created credential shares');
   }
-  console.log(`✅ Created ${credentials.length} credentials`);
-
-  // Create credential shares
-  console.log('\n🔗 Creating credential shares...');
-  await prisma.credentialShare.create({
-    data: {
-      credentialId: credentials[0].id, // ChatGPT
-      userId: user1.id,
-      permission: CredentialPermission.VIEW_ONLY,
-    },
-  });
-  await prisma.credentialShare.create({
-    data: {
-      credentialId: credentials[1].id, // Orchids
-      userId: admin1.id,
-      permission: CredentialPermission.EDIT,
-    },
-  });
-  await prisma.credentialShare.create({
-    data: {
-      credentialId: credentials[2].id, // Cursor
-      userId: user1.id,
-      permission: CredentialPermission.VIEW_ONLY,
-    },
-  });
-  console.log('✅ Created credential shares');
 
   // Create dummy invoices for the tools
   console.log('\n📄 Creating dummy invoices...');
@@ -747,37 +732,47 @@ async function main() {
     },
   ];
 
+  // Check if invoices already exist
+  const existingInvoices = await prisma.invoice.findMany({
+    where: { organizationId: organization.id },
+  });
+
   const invoices = [];
-  for (const inv of invoiceData) {
-    const invoiceDataToCreate: any = {
-      invoiceNumber: inv.invoiceNumber,
-      amount: inv.amount,
-      currency: inv.currency,
-      provider: inv.provider,
-      billingDate: inv.billingDate,
-      dueDate: inv.dueDate,
-      category: inv.category,
-      status: inv.status,
-      organizationId: organization.id,
-      uploadedById: inv.uploadedBy.id,
-      approvedById: inv.approvedBy?.id,
-      approvedAt: inv.approvedAt,
-    };
+  if (existingInvoices.length > 0) {
+    console.log(`   ⏩ Skipping - ${existingInvoices.length} invoices already exist`);
+    invoices.push(...existingInvoices);
+  } else {
+    for (const inv of invoiceData) {
+      const invoiceDataToCreate: any = {
+        invoiceNumber: inv.invoiceNumber,
+        amount: inv.amount,
+        currency: inv.currency,
+        provider: inv.provider,
+        billingDate: inv.billingDate,
+        dueDate: inv.dueDate,
+        category: inv.category,
+        status: inv.status,
+        organizationId: organization.id,
+        uploadedById: inv.uploadedBy.id,
+        approvedById: inv.approvedBy?.id,
+        approvedAt: inv.approvedAt,
+      };
 
-    // Add optional rejection fields if they exist
-    if ('rejectedAt' in inv && inv.rejectedAt) {
-      invoiceDataToCreate.rejectedAt = inv.rejectedAt;
-    }
-    if ('rejectionReason' in inv && inv.rejectionReason) {
-      invoiceDataToCreate.rejectionReason = inv.rejectionReason;
-    }
+      // Add optional rejection fields if they exist
+      if ('rejectedAt' in inv && inv.rejectedAt) {
+        invoiceDataToCreate.rejectedAt = inv.rejectedAt;
+      }
+      if ('rejectionReason' in inv && inv.rejectionReason) {
+        invoiceDataToCreate.rejectionReason = inv.rejectionReason;
+      }
 
-    const created = await prisma.invoice.create({
-      data: invoiceDataToCreate,
-    });
-    invoices.push(created);
+      const created = await prisma.invoice.create({
+        data: invoiceDataToCreate,
+      });
+      invoices.push(created);
+    }
+    console.log(`✅ Created ${invoices.length} invoices`);
   }
-  console.log(`✅ Created ${invoices.length} invoices`);
 
   // Link invoices to credentials
   console.log('\n🔗 Linking invoices to credentials...');
