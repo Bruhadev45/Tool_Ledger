@@ -46,7 +46,7 @@ async function bootstrap() {
   const frontendUrl = configService.get('FRONTEND_URL') || 'http://localhost:3000';
   // Use PORT from env (Railway sets this), or ConfigService, or default to 3001 for local dev
   const port = process.env.PORT || configService.get('PORT') || 3001;
-  
+
   app.enableCors({
     origin: frontendUrl,
     credentials: true, // Allow cookies and authorization headers

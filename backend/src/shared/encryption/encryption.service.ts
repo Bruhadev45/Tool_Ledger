@@ -63,7 +63,11 @@ export class EncryptionService {
     const [ivHex, authTagHex, encrypted] = parts;
 
     // Validate hex strings
-    if (!/^[0-9a-f]+$/i.test(ivHex) || !/^[0-9a-f]+$/i.test(authTagHex) || !/^[0-9a-f]+$/i.test(encrypted)) {
+    if (
+      !/^[0-9a-f]+$/i.test(ivHex) ||
+      !/^[0-9a-f]+$/i.test(authTagHex) ||
+      !/^[0-9a-f]+$/i.test(encrypted)
+    ) {
       this.logger.error('Decryption failed: Invalid hex format in encrypted data');
       throw new Error('Invalid encrypted data: contains non-hexadecimal characters');
     }
@@ -74,12 +78,16 @@ export class EncryptionService {
 
       // Validate buffer lengths
       if (iv.length !== 16) {
-        this.logger.error(`Decryption failed: Invalid IV length. Expected 16 bytes, got ${iv.length}`);
+        this.logger.error(
+          `Decryption failed: Invalid IV length. Expected 16 bytes, got ${iv.length}`,
+        );
         throw new Error('Invalid encrypted data: IV must be 16 bytes');
       }
 
       if (authTag.length !== 16) {
-        this.logger.error(`Decryption failed: Invalid auth tag length. Expected 16 bytes, got ${authTag.length}`);
+        this.logger.error(
+          `Decryption failed: Invalid auth tag length. Expected 16 bytes, got ${authTag.length}`,
+        );
         throw new Error('Invalid encrypted data: Auth tag must be 16 bytes');
       }
 
@@ -92,7 +100,10 @@ export class EncryptionService {
       return decrypted;
     } catch (error: any) {
       // Check if it's an authentication error (wrong key)
-      if (error.message?.includes('Unsupported state') || error.message?.includes('unable to authenticate')) {
+      if (
+        error.message?.includes('Unsupported state') ||
+        error.message?.includes('unable to authenticate')
+      ) {
         this.logger.error(
           'Decryption failed: Authentication error. This usually means the ENCRYPTION_KEY is different from the one used to encrypt the data.',
         );

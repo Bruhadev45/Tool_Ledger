@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateOrganizationDto } from './dto/create-organization.dto';
 import { UpdateOrganizationDto } from './dto/update-organization.dto';
@@ -75,7 +80,9 @@ export class OrganizationsService {
       });
 
       if (existing && existing.id !== id) {
-        throw new ConflictException(`Domain ${updateDto.domain} is already taken by another organization`);
+        throw new ConflictException(
+          `Domain ${updateDto.domain} is already taken by another organization`,
+        );
       }
     }
 
@@ -227,7 +234,9 @@ export class OrganizationsService {
     });
 
     if (!credential) {
-      throw new NotFoundException(`Credential with ID ${credentialId} not found in this organization`);
+      throw new NotFoundException(
+        `Credential with ID ${credentialId} not found in this organization`,
+      );
     }
 
     // Find a default organization or create one for orphaned credentials

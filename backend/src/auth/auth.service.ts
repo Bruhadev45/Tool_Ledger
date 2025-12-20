@@ -360,7 +360,9 @@ export class AuthService {
     // Development bypass: Allow "000000" for testing MFA setup
     // NOTE: This should be disabled in production or controlled via environment variable
     if (process.env.NODE_ENV === 'development' && cleanToken === '000000') {
-      this.logger.warn('⚠️  Using development MFA bypass code. This should not be used in production.');
+      this.logger.warn(
+        '⚠️  Using development MFA bypass code. This should not be used in production.',
+      );
       // Enable MFA without verification
       await this.prisma.user.update({
         where: { id: userId },
@@ -416,7 +418,9 @@ export class AuthService {
     // Development bypass: Allow "000000" for testing MFA verification
     // NOTE: This should be disabled in production or controlled via environment variable
     if (process.env.NODE_ENV === 'development' && cleanToken === '000000') {
-      this.logger.warn('⚠️  Using development MFA bypass code. This should not be used in production.');
+      this.logger.warn(
+        '⚠️  Using development MFA bypass code. This should not be used in production.',
+      );
       return true;
     }
 
@@ -546,7 +550,9 @@ export class AuthService {
     // For now, token is returned in development mode for testing
     if (process.env.NODE_ENV === 'development') {
       this.logger.log(`Password reset token for ${email}: ${resetToken}`);
-      this.logger.warn('⚠️  Password reset token returned in response. In production, send via email.');
+      this.logger.warn(
+        '⚠️  Password reset token returned in response. In production, send via email.',
+      );
     }
 
     return {

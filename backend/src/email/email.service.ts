@@ -4,10 +4,10 @@ import * as nodemailer from 'nodemailer';
 
 /**
  * Email Service
- * 
+ *
  * Handles sending email notifications via Gmail SMTP.
  * Used primarily for notifying users when credentials are shared with them.
- * 
+ *
  * Configuration:
  * - SMTP_USER: Gmail address
  * - SMTP_PASSWORD: Gmail App Password (not regular password)
@@ -56,15 +56,15 @@ export class EmailService {
 
   /**
    * Send email notification when credentials are shared with a user
-   * 
+   *
    * @param recipientEmail - Email address of the user receiving the credential
    * @param recipientName - Full name of the recipient
    * @param credentialName - Name of the credential being shared
    * @param sharedBy - Name of the user who shared the credential
    * @param permission - Permission level (View Only or Edit)
-   * 
+   *
    * @returns Promise that resolves when email is sent (or skipped if SMTP not configured)
-   * 
+   *
    * Note: This method does not throw errors. If email sending fails, it's logged but
    * doesn't break the credential sharing flow.
    */
@@ -215,7 +215,10 @@ If you did not expect this notification, please contact your administrator.
     // Send email with both HTML and plain text versions for better compatibility
     try {
       await this.transporter.sendMail({
-        from: this.configService.get<string>('SMTP_FROM', this.configService.get<string>('SMTP_USER')),
+        from: this.configService.get<string>(
+          'SMTP_FROM',
+          this.configService.get<string>('SMTP_USER'),
+        ),
         to: recipientEmail,
         subject,
         text, // Plain text version for email clients that don't support HTML
@@ -230,10 +233,10 @@ If you did not expect this notification, please contact your administrator.
 
   /**
    * Test SMTP connection configuration
-   * 
+   *
    * Verifies that SMTP credentials are correct and can connect to Gmail servers.
    * Used by the test endpoint to verify email service setup.
-   * 
+   *
    * @returns Promise<boolean> - true if connection successful, false otherwise
    */
   async testConnection(): Promise<boolean> {

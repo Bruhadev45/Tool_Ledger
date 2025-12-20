@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import api from '@/lib/api';
@@ -33,14 +33,7 @@ export default function NewInvoicePage() {
   const [credentials, setCredentials] = useState<any[]>([]);
   const [selectedCredentialIds, setSelectedCredentialIds] = useState<string[]>([]);
 
-  useEffect(() => {
-    loadCredentials();
-    if (isAdmin) {
-      loadOrganizations();
-    }
-  }, [isAdmin]);
-
-  const loadOrganizations = async () => {
+  const loadOrganizations = useCallback(async () => {
     try {
       const res = await api.get('/organizations');
       setOrganizations(res.data || []);
@@ -55,9 +48,9 @@ export default function NewInvoicePage() {
       console.error('Error loading organizations:', error);
       // Don't show error toast, just silently fail
     }
-  };
+  }, [userOrganizationId]);
 
-  const loadCredentials = async () => {
+  const loadCredentials = useCallback(async () => {
     try {
       const res = await api.get('/credentials');
       setCredentials(res.data || []);
@@ -65,7 +58,14 @@ export default function NewInvoicePage() {
       console.error('Error loading credentials:', error);
       // Don't show error toast, just silently fail - credentials are optional
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadCredentials();
+    if (isAdmin) {
+      loadOrganizations();
+    }
+  }, [isAdmin, loadCredentials, loadOrganizations]);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0] || null;
