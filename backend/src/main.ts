@@ -80,30 +80,20 @@ async function bootstrap() {
   // Set global API prefix: All routes will be prefixed with /api
   app.setGlobalPrefix('api');
 
-  // Root endpoint: Provides API information and available endpoints
-  app
-    .getHttpAdapter()
-    .get(
-      '/',
-      (req: unknown, res: { status: (code: number) => { json: (data: unknown) => void } }) => {
-        res.status(200).json({
-          message: 'ToolLedger API',
-          version: '2.0.0',
-          info: 'All API endpoints are prefixed with /api',
-          endpoints: {
-            health: '/api/health',
-            auth: '/api/auth',
-            analytics: '/api/analytics',
-            credentials: '/api/credentials',
-            invoices: '/api/invoices',
-          },
-        });
-      },
-    );
+    // Root endpoint: Provides API information and available endpoints
+    app.getHttpAdapter().get('/', (req: any, res: any) => {
+      console.log('Root healthcheck hit');
+      res.status(200).json({
+        message: 'ToolLedger API',
+        version: '2.0.0',
+        status: 'ok'
+      });
+    });
 
-  // Start the server on configured port
-  // Railway provides PORT env var, default to 8080 if not set
-  await app.listen(port, '0.0.0.0');
+    // Start the server on configured port
+    await app.listen(port, '0.0.0.0');
+    console.log(`🚀 Server actually listening on 0.0.0.0:${port}`);
+
 
   // Log server startup information
   const logger = new Logger('Bootstrap');
