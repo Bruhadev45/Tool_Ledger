@@ -58,11 +58,11 @@ export class InvoicesParserService {
             const pdfjsLib = await new Function('specifier', 'return import(specifier)')(
               'pdfjs-dist/legacy/build/pdf.mjs',
             );
-            
+
             if (!pdfjsLib || typeof pdfjsLib.getDocument !== 'function') {
               throw new Error('pdfjs-dist module loaded but getDocument is not available');
             }
-            
+
             const loadingTask = pdfjsLib.getDocument({
               data: new Uint8Array(file.buffer),
               verbosity: 0, // Suppress warnings
