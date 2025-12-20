@@ -127,6 +127,8 @@ export default function NewCredentialPage() {
       });
 
       toast.success('Credential created successfully');
+      // Small delay to ensure backend has processed the creation
+      await new Promise(resolve => setTimeout(resolve, 500));
       router.push('/credentials');
     } catch (error: any) {
       console.error('Error creating credential:', error);

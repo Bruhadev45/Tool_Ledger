@@ -61,15 +61,15 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    // For ADMIN users without MFA: Allow first login to set up MFA
-    // Check if this is a fresh admin (no MFA, no lastLoginAt) - allow one-time login
+    // For ADMIN users on first login: suggest MFA setup but don't require it
+    // Check if this is a fresh admin (no MFA, no lastLoginAt) - allow login with suggestion
     if (user.role === UserRole.ADMIN && !user.mfaEnabled && !user.lastLoginAt) {
-      // Mark that they've logged in once (so they can set up MFA)
+      // Mark that they've logged in once (so they can set up MFA if they want)
       await this.prisma.user.update({
         where: { id: user.id },
         data: { lastLoginAt: new Date() },
       });
-      // Return user with a flag indicating they need to set up MFA
+      // Return user with a flag indicating they can set up MFA (but it's optional)
       const { passwordHash, ...result } = user;
       return { ...result, requiresMfaSetup: true };
     }
@@ -84,11 +84,11 @@ export class AuthService {
    * Creates access token (short-lived) and refresh token (long-lived) for the user.
    * Access token contains user identity and role information.
    * 
-   * IMPORTANT: For ADMIN users, MFA is mandatory. If MFA is not enabled, login will fail.
+   * MFA is optional for all users including admins. If MFA is enabled by the user,
+   * it will be required during login. Otherwise, users can login without MFA.
    *
    * @param user - Authenticated user object
    * @returns Object containing access_token, refresh_token, and user data
-   * @throws UnauthorizedException if admin user doesn't have MFA enabled
    */
   async login(user: {
     id: string;
@@ -100,37 +100,6 @@ export class AuthService {
     mfaEnabled: boolean;
     requiresMfaSetup?: boolean;
   }) {
-    // MFA is mandatory for ADMIN users (except first-time login to set up MFA)
-    if (user.role === UserRole.ADMIN && !user.mfaEnabled && !user.requiresMfaSetup) {
-      throw new UnauthorizedException(
-        'Multi-factor authentication (MFA) is required for admin accounts. Please enable MFA in your account settings before logging in.',
-      );
-    }
-    
-    // If this is first-time admin login, allow it but return a flag
-    if (user.requiresMfaSetup) {
-      return {
-        access_token: this.jwtService.sign({
-          email: user.email,
-          sub: user.id,
-          role: user.role,
-          organizationId: user.organizationId,
-        }),
-        refresh_token: await this.generateRefreshToken(user.id),
-        user: {
-          id: user.id,
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          role: user.role,
-          organizationId: user.organizationId,
-          mfaEnabled: false,
-        },
-        requiresMfaSetup: true,
-        message: 'Please set up MFA in your account settings before your next login.',
-      };
-    }
-
     // Create JWT payload with user information
     const payload = {
       email: user.email,
@@ -139,7 +108,8 @@ export class AuthService {
       organizationId: user.organizationId,
     };
 
-    return {
+    // For first-time admin login, suggest MFA setup but don't require it
+    const loginResponse = {
       access_token: this.jwtService.sign(payload),
       refresh_token: await this.generateRefreshToken(user.id),
       user: {
@@ -152,6 +122,17 @@ export class AuthService {
         mfaEnabled: user.mfaEnabled,
       },
     };
+
+    // If this is first-time admin login, suggest MFA setup
+    if (user.requiresMfaSetup) {
+      return {
+        ...loginResponse,
+        requiresMfaSetup: true,
+        message: 'For enhanced security, we recommend setting up MFA in your account settings.',
+      };
+    }
+
+    return loginResponse;
   }
 
   /**

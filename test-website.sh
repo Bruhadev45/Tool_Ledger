@@ -70,7 +70,7 @@ test_endpoint "Admin Login (MFA Required)" "POST" "/auth/login" \
 
 # Test registration
 test_endpoint "User Registration" "POST" "/auth/register" \
-    '{"email":"testuser@example.com","password":"Test123!","firstName":"Test","lastName":"User","domain":"example.com"}' "201"
+    "{\"email\":\"testuser-$(date +%s)@example.com\",\"password\":\"Test123!\",\"firstName\":\"Test\",\"lastName\":\"User\",\"domain\":\"example.com\"}" "201"
 echo ""
 
 # 3. Database State Check

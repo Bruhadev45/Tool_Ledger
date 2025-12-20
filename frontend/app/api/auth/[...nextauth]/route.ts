@@ -20,7 +20,7 @@ async function refreshAccessToken(token: any) {
     let updatedOrganizationId = token.organizationId;
     
     try {
-      const profileResponse = await axios.get(`${API_URL}/auth/profile`, {
+      const profileResponse = await axios.get(`${API_URL}/auth/me`, {
         headers: {
           Authorization: `Bearer ${refreshedTokens.access_token}`,
         },

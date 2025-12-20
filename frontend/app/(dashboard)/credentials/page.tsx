@@ -27,12 +27,29 @@ export default function CredentialsPage() {
       setIsRefreshing(true);
       setError(null);
       const res = await api.get('/credentials');
-      setRawCredentials(res.data);
+      
+      // Handle different response formats
+      let credentialsData = res.data;
+      if (res.data && typeof res.data === 'object' && !Array.isArray(res.data)) {
+        // If response is wrapped, try to extract array
+        credentialsData = res.data.data || res.data.credentials || [];
+      }
+      
+      // Ensure it's an array
+      if (!Array.isArray(credentialsData)) {
+        console.warn('Credentials API returned non-array:', credentialsData);
+        credentialsData = [];
+      }
+      
+      console.log('Loaded credentials:', credentialsData.length, credentialsData);
+      setRawCredentials(credentialsData);
       setLastUpdated(new Date());
     } catch (error: any) {
       console.error('Error loading credentials:', error);
+      console.error('Error response:', error.response?.data);
       setError(error.response?.data?.message || 'Failed to load credentials');
       if (showLoading) toast.error('Failed to load credentials');
+      setRawCredentials([]); // Set empty array on error
     } finally {
       setLoading(false);
       setIsRefreshing(false);
@@ -114,6 +131,17 @@ export default function CredentialsPage() {
     const handleOnline = () => loadCredentials(false);
     window.addEventListener('online', handleOnline);
     return () => window.removeEventListener('online', handleOnline);
+  }, [loadCredentials]);
+
+  // Refresh when page becomes visible (e.g., returning from new credential page)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        loadCredentials(false);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [loadCredentials]);
 
   const handleDelete = async (credentialId: string) => {
@@ -355,11 +383,23 @@ export default function CredentialsPage() {
         ))}
       </div>
 
-      {credentials.length === 0 && (
+      {credentials.length === 0 && !loading && (
         <div className="text-center py-12">
           <Key className="mx-auto h-12 w-12 text-gray-400" />
-          <h3 className="mt-2 text-sm font-medium text-gray-900">No credentials</h3>
-          <p className="mt-1 text-sm text-gray-500">Get started by creating a new credential.</p>
+          <h3 className="mt-2 text-sm font-medium text-gray-900">No credentials found</h3>
+          <p className="mt-1 text-sm text-gray-500">
+            {error 
+              ? `Error: ${error}. Please try refreshing.`
+              : 'Get started by creating a new credential.'}
+          </p>
+          {error && (
+            <button
+              onClick={() => { loadCredentials(); }}
+              className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+            >
+              Retry
+            </button>
+          )}
         </div>
       )}
     </div>
