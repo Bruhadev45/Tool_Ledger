@@ -123,7 +123,8 @@ export default function UsersPage() {
       }
       setEditingUser(null);
       setEditData({});
-      loadUsers();
+      // Reload users to reflect the changes
+      await loadUsers();
     } catch (error: any) {
       console.error('Update failed:', error);
       toast.error(error.response?.data?.message || 'Failed to update user');
@@ -146,7 +147,7 @@ export default function UsersPage() {
       if (!userData.teamId) {
         delete userData.teamId;
       }
-      await api.post('/users', userData);
+      const response = await api.post('/users', userData);
       toast.success('User created successfully');
       setShowAddModal(false);
       setNewUser({
@@ -157,7 +158,14 @@ export default function UsersPage() {
         role: 'USER',
         teamId: '',
       });
-      loadUsers();
+      
+      // Clear filters to ensure new user is visible (this will trigger useEffect to reload)
+      setFilterRole('');
+      setFilterStatus('');
+      
+      // Force reload users list immediately to show the newly created user
+      // The useEffect will also trigger due to filter changes, but this ensures immediate update
+      await loadUsers();
     } catch (error: any) {
       console.error('Create user failed:', error);
       toast.error(error.response?.data?.message || 'Failed to create user');
