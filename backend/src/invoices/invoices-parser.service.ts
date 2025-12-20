@@ -66,18 +66,31 @@ export class InvoicesParserService {
               try {
                 const page = await pdf.getPage(i);
                 const content = await page.getTextContent();
-                // Better text extraction - preserve line breaks and structure
-                const pageText = content.items
-                  .map((item: any) => {
-                    // Handle text items with proper spacing
-                    if (item.str) {
-                      return item.str;
+                // Better text extraction - preserve structure and spacing
+                let pageText = '';
+                let lastY = null;
+                let lastX = null;
+                
+                for (const item of content.items) {
+                  if (item.str) {
+                    // Preserve spacing based on position
+                    const currentY = item.transform?.[5] || 0; // Y position
+                    const currentX = item.transform?.[4] || 0; // X position
+                    
+                    // Add newline if Y position changed significantly (new line)
+                    if (lastY !== null && Math.abs(currentY - lastY) > 5) {
+                      pageText += '\n';
                     }
-                    return '';
-                  })
-                  .join(' ')
-                  .replace(/\s+/g, ' ') // Normalize whitespace
-                  .trim();
+                    // Add space if X position changed significantly (new word)
+                    else if (lastX !== null && Math.abs(currentX - lastX) > 10 && pageText.length > 0 && !pageText.endsWith('\n') && !pageText.endsWith(' ')) {
+                      pageText += ' ';
+                    }
+                    
+                    pageText += item.str;
+                    lastY = currentY;
+                    lastX = currentX;
+                  }
+                }
                 
                 extractedText += pageText + '\n\n';
               } catch (pageError) {
@@ -86,8 +99,9 @@ export class InvoicesParserService {
             }
             
             // Clean and normalize the extracted text
+            // Preserve line breaks for better structure, but normalize excessive whitespace
             text = extractedText
-              .replace(/\s+/g, ' ') // Normalize multiple spaces
+              .replace(/[ \t]+/g, ' ') // Normalize multiple spaces/tabs to single space
               .replace(/\n{3,}/g, '\n\n') // Normalize multiple newlines
               .trim();
             
@@ -120,11 +134,12 @@ export class InvoicesParserService {
       }
 
       // Clean and normalize text before processing
+      // Preserve line breaks for better date/amount detection
       text = text
         .replace(/\r\n/g, '\n') // Normalize line endings
         .replace(/\r/g, '\n')
         .replace(/\n{3,}/g, '\n\n') // Normalize multiple newlines
-        .replace(/\s+/g, ' ') // Normalize multiple spaces
+        .replace(/[ \t]+/g, ' ') // Normalize multiple spaces/tabs to single space (but keep newlines)
         .trim();
 
       // Always include filename in text for provider detection (add as separate line)
@@ -132,41 +147,81 @@ export class InvoicesParserService {
 
       this.logger.debug(`Processing text (${text.length} chars) for invoice extraction`);
 
-      // Try OpenAI parsing first if available, otherwise use regex
+      // Always try OpenAI parsing first if available (it's much better for amount/date detection)
       if (this.openaiClient && text.length > 50) {
         try {
-          this.logger.debug('Attempting OpenAI-powered parsing');
+          this.logger.debug(`Attempting OpenAI-powered parsing (text length: ${text.length} chars)`);
           const aiExtracted = await this.parseWithOpenAI(text, file.originalname);
-          // Merge AI results with regex fallback
+          // Prioritize OpenAI results, use regex only as fallback
+          this.logger.debug('OpenAI extraction results:', JSON.stringify(aiExtracted, null, 2));
+          
+          // Invoice Number: Use AI first, fallback to regex
           extractedData.invoiceNumber =
             aiExtracted.invoiceNumber || this.extractInvoiceNumber(text);
 
-          // Ensure amount is a valid number
+          // Amount: Prioritize OpenAI (it's better at finding totals)
           const aiAmount = aiExtracted.amount;
-          const regexAmount = this.extractAmount(text);
           if (aiAmount !== null && aiAmount !== undefined) {
             const numAmount =
               typeof aiAmount === 'number' ? aiAmount : parseFloat(String(aiAmount));
             if (!isNaN(numAmount) && isFinite(numAmount) && numAmount > 0) {
               extractedData.amount = Math.round(numAmount * 100) / 100;
-            } else if (regexAmount) {
-              extractedData.amount = regexAmount;
+              this.logger.debug(`Using OpenAI amount: ${extractedData.amount}`);
+            } else {
+              // AI amount invalid, try regex
+              const regexAmount = this.extractAmount(text);
+              if (regexAmount) {
+                extractedData.amount = regexAmount;
+                this.logger.debug(`Using regex amount (AI invalid): ${extractedData.amount}`);
+              }
             }
-          } else if (regexAmount) {
-            extractedData.amount = regexAmount;
+          } else {
+            // No AI amount, use regex
+            const regexAmount = this.extractAmount(text);
+            if (regexAmount) {
+              extractedData.amount = regexAmount;
+              this.logger.debug(`Using regex amount (AI missing): ${extractedData.amount}`);
+            }
           }
 
           extractedData.currency = 'USD'; // Always use USD
+          
+          // Provider: Use AI first, fallback to regex
           extractedData.provider =
             aiExtracted.provider || this.extractProvider(text, file.originalname);
-          extractedData.billingDate = aiExtracted.billingDate || this.extractDate(text, 'billing');
-          extractedData.dueDate = aiExtracted.dueDate || this.extractDate(text, 'due');
+          
+          // Dates: Prioritize OpenAI (it's better at understanding context)
+          if (aiExtracted.billingDate) {
+            const normalizedBillingDate = this.normalizeDate(aiExtracted.billingDate);
+            extractedData.billingDate = normalizedBillingDate || aiExtracted.billingDate;
+            this.logger.debug(`Using OpenAI billing date: ${extractedData.billingDate}`);
+          } else {
+            extractedData.billingDate = this.extractDate(text, 'billing');
+            if (extractedData.billingDate) {
+              this.logger.debug(`Using regex billing date: ${extractedData.billingDate}`);
+            }
+          }
+          
+          if (aiExtracted.dueDate) {
+            const normalizedDueDate = this.normalizeDate(aiExtracted.dueDate);
+            extractedData.dueDate = normalizedDueDate || aiExtracted.dueDate;
+            this.logger.debug(`Using OpenAI due date: ${extractedData.dueDate}`);
+          } else {
+            extractedData.dueDate = this.extractDate(text, 'due');
+            if (extractedData.dueDate) {
+              this.logger.debug(`Using regex due date: ${extractedData.dueDate}`);
+            }
+          }
+          
+          // Category: Use AI first, fallback to regex
           extractedData.category =
             aiExtracted.category || this.extractCategory(text, extractedData.provider);
-          this.logger.debug('OpenAI parsing completed');
+          
+          this.logger.debug('OpenAI parsing completed successfully');
         } catch (error) {
           this.logger.warn(`OpenAI parsing failed, using regex fallback: ${error.message}`);
-          // Fallback to regex extraction
+          this.logger.debug(`Error details: ${error.stack}`);
+          // Fallback to regex extraction only if OpenAI completely fails
           extractedData.invoiceNumber = this.extractInvoiceNumber(text);
 
           // Ensure amount is a valid number
@@ -324,23 +379,29 @@ export class InvoicesParserService {
     // Improved patterns with better accuracy and more comprehensive matching
     const patterns = [
       // Total/Amount/Balance/Due with currency symbols (highest priority)
-      // More comprehensive labels
-      /(?:total|amount|subtotal|balance|due|grand\s*total|invoice\s*amount|payable|charges|bill\s*amount|payment\s*amount|amount\s*due|balance\s*due)\s*(?:amount)?\s*:?\s*[₹$€£¥]?\s*([\d,]+\.?\d{2}?)/i,
-      // Currency symbols: $, ₹, €, £, ¥ (with decimal places)
-      /[₹$€£¥]\s*([\d,]+\.?\d{2}?)/,
+      // More comprehensive labels - handle various formats
+      /(?:total|amount|subtotal|balance|due|grand\s*total|invoice\s*amount|payable|charges|bill\s*amount|payment\s*amount|amount\s*due|balance\s*due|final\s*amount|net\s*amount)\s*(?:amount)?\s*:?\s*[₹$€£¥]?\s*([\d,]+\.?\d{1,2}?)/i,
+      // Amount with label and colon/equals: "Total: $123.45" or "Amount = 123.45"
+      /(?:total|amount|balance|due|payable)\s*[:=]\s*[₹$€£¥]?\s*([\d,]+\.?\d{1,2}?)/i,
+      // Currency symbols: $, ₹, €, £, ¥ (with decimal places) - handle spaces
+      /[₹$€£¥]\s*([\d,\s]+\.?\d{1,2}?)/,
       // Currency codes: USD, INR, EUR, GBP, CAD, etc. (with decimal places)
-      /(?:USD|INR|EUR|GBP|CAD|AUD|JPY|CNY)\s*([\d,]+\.?\d{2}?)/i,
+      /(?:USD|INR|EUR|GBP|CAD|AUD|JPY|CNY)\s*([\d,\s]+\.?\d{1,2}?)/i,
       // Indian Rupee formats: Rs. 1,234.56, Rs 1,234.56, ₹1,234.56
-      /Rs\.?\s*([\d,]+\.?\d{2}?)/i,
+      /Rs\.?\s*([\d,\s]+\.?\d{1,2}?)/i,
       // Amount with "USD" or currency code after number
-      /([\d,]+\.?\d{2}?)\s*(?:USD|INR|EUR|GBP|CAD|AUD)/i,
+      /([\d,\s]+\.?\d{1,2}?)\s*(?:USD|INR|EUR|GBP|CAD|AUD)/i,
       // Decimal amounts with 2 decimal places (common invoice format)
       // Match larger amounts first (more likely to be totals)
-      /([\d]{1,3}(?:,\d{3})*\.\d{2})\b/,
-      // Amounts with commas and optional decimals
-      /([\d]{1,3}(?:,\d{3})+(?:\.\d{1,2})?)\b/,
-      // Any number that looks like an amount (with commas and decimals)
-      /([\d]{1,3}(?:,\d{3})*(?:\.\d{2})?)\b/,
+      /([\d]{1,3}(?:[,\s]\d{3})*\.\d{2})\b/,
+      // Amounts with commas/spaces and optional decimals: 1,234.56 or 1 234.56
+      /([\d]{1,3}(?:[,\s]\d{3})+(?:\.\d{1,2})?)\b/,
+      // Any number that looks like an amount (with commas/spaces and decimals)
+      /([\d]{1,3}(?:[,\s]\d{3})*(?:\.\d{1,2})?)\b/,
+      // Amounts without thousand separators but with decimals: 1234.56
+      /([\d]{2,}\.\d{2})\b/,
+      // Large numbers that might be amounts: 12345.67
+      /([\d]{4,}\.\d{1,2})\b/,
     ];
 
     let bestMatch: { amount: number; confidence: number } | null = null;
@@ -351,7 +412,8 @@ export class InvoicesParserService {
         const matches = text.matchAll(new RegExp(pattern.source, pattern.flags + 'g'));
         for (const match of matches) {
           if (match && match[1]) {
-            const amountStr = match[1].replace(/,/g, '').trim();
+            // Remove commas, spaces, and normalize
+            const amountStr = match[1].replace(/[,\s]/g, '').trim();
             const amount = parseFloat(amountStr);
 
             if (!isNaN(amount) && amount > 0 && amount < 1000000000 && !seenAmounts.has(amount)) {
@@ -401,6 +463,7 @@ export class InvoicesParserService {
     }
 
     this.logger.warn('Could not extract amount from invoice text');
+    this.logger.debug(`Text sample (first 500 chars): ${text.substring(0, 500)}`);
     return undefined;
   }
 
@@ -523,29 +586,46 @@ export class InvoicesParserService {
     const datePatterns = [
       // ISO format: YYYY-MM-DD
       /(\d{4}-\d{2}-\d{2})/,
-      // US format: MM/DD/YYYY
+      // US format: MM/DD/YYYY or M/D/YYYY
       /(\d{1,2}\/\d{1,2}\/\d{4})/,
-      // European format: DD/MM/YYYY
+      // European format: DD/MM/YYYY or D/M/YYYY
       /(\d{1,2}\/\d{1,2}\/\d{4})/,
-      // Dash format: DD-MM-YYYY or MM-DD-YYYY
+      // Dash format: DD-MM-YYYY or MM-DD-YYYY or D-M-YYYY
       /(\d{1,2}-\d{1,2}-\d{4})/,
-      // Month name: January 15, 2024 or Jan 15, 2024
+      // Dot format: DD.MM.YYYY or MM.DD.YYYY
+      /(\d{1,2}\.\d{1,2}\.\d{4})/,
+      // Month name: January 15, 2024 or Jan 15, 2024 or 15 January 2024
       /(January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2},?\s+\d{4}/i,
-      // Month name with dashes: 15-Jan-2024
+      /(\d{1,2}\s+(?:January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{4})/i,
+      // Month name with dashes: 15-Jan-2024 or Jan-15-2024
       /(\d{1,2}[-/](?:January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[-/]\d{4})/i,
+      /((?:January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[-/]\d{1,2}[-/]\d{4})/i,
+      // Short year format: DD/MM/YY or MM/DD/YY
+      /(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2})/,
     ];
 
     // Look for specific date labels (more comprehensive)
+    // Handle cases where label and date might be on different lines or have various separators
     const labelPatterns = {
       billing: [
-        /(?:invoice\s*date|billing\s*date|date\s*of\s*invoice|issue\s*date|invoice\s*issued|date\s*issued|bill\s*date)\s*:?\s*(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i,
-        /(?:invoice\s*date|billing\s*date|date\s*of\s*invoice|issue\s*date|invoice\s*issued|date\s*issued|bill\s*date)\s*:?\s*(\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2})/i,
-        /(?:invoice\s*date|billing\s*date|date\s*of\s*invoice|issue\s*date)\s*:?\s*((?:January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2},?\s+\d{4})/i,
+        // Date with label and various separators (handle :, =, or just space)
+        /(?:invoice\s*date|billing\s*date|date\s*of\s*invoice|issue\s*date|invoice\s*issued|date\s*issued|bill\s*date|invoice\s*no\.?\s*date|invoice\s*#\s*date)\s*[:=\s]+\s*(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/i,
+        /(?:invoice\s*date|billing\s*date|date\s*of\s*invoice|issue\s*date|invoice\s*issued|date\s*issued|bill\s*date)\s*[:=\s]+\s*(\d{4}[\/\-\.]\d{1,2}[\/\-\.]\d{1,2})/i,
+        // Date with label and month names
+        /(?:invoice\s*date|billing\s*date|date\s*of\s*invoice|issue\s*date)\s*[:=\s]+\s*((?:January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2},?\s+\d{4})/i,
+        /(?:invoice\s*date|billing\s*date|date\s*of\s*invoice|issue\s*date)\s*[:=\s]+\s*(\d{1,2}\s+(?:January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{4})/i,
+        // Handle label on one line, date on next (with newline)
+        /(?:invoice\s*date|billing\s*date|date\s*of\s*invoice|issue\s*date)\s*[:=\s]*\s*\n\s*(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/i,
       ],
       due: [
-        /(?:due\s*date|payment\s*due|pay\s*by|due\s*by|payment\s*due\s*date|amount\s*due\s*by)\s*:?\s*(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i,
-        /(?:due\s*date|payment\s*due|pay\s*by|due\s*by|payment\s*due\s*date|amount\s*due\s*by)\s*:?\s*(\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2})/i,
-        /(?:due\s*date|payment\s*due|pay\s*by|due\s*by)\s*:?\s*((?:January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2},?\s+\d{4})/i,
+        // Date with label and various separators
+        /(?:due\s*date|payment\s*due|pay\s*by|due\s*by|payment\s*due\s*date|amount\s*due\s*by|payable\s*by|pay\s*on)\s*[:=\s]+\s*(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/i,
+        /(?:due\s*date|payment\s*due|pay\s*by|due\s*by|payment\s*due\s*date|amount\s*due\s*by)\s*[:=\s]+\s*(\d{4}[\/\-\.]\d{1,2}[\/\-\.]\d{1,2})/i,
+        // Date with label and month names
+        /(?:due\s*date|payment\s*due|pay\s*by|due\s*by)\s*[:=\s]+\s*((?:January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2},?\s+\d{4})/i,
+        /(?:due\s*date|payment\s*due|pay\s*by|due\s*by)\s*[:=\s]+\s*(\d{1,2}\s+(?:January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{4})/i,
+        // Handle label on one line, date on next (with newline)
+        /(?:due\s*date|payment\s*due|pay\s*by|due\s*by)\s*[:=\s]*\s*\n\s*(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/i,
       ],
     };
 
@@ -565,23 +645,43 @@ export class InvoicesParserService {
       }
     }
 
-    // Then try general date patterns
+    // Then try general date patterns (match all occurrences and pick the best one)
+    const dateCandidates: Array<{ date: string; confidence: number }> = [];
+    
     for (const pattern of datePatterns) {
       try {
-        const match = text.match(pattern);
-        if (match && match[1]) {
-          const dateStr = this.normalizeDate(match[1]);
-          if (dateStr) {
-            this.logger.debug(`Extracted ${type} date: ${dateStr} using general pattern`);
-            return dateStr;
+        const matches = text.matchAll(new RegExp(pattern.source, pattern.flags + 'g'));
+        for (const match of matches) {
+          if (match && match[1]) {
+            const dateStr = this.normalizeDate(match[1]);
+            if (dateStr) {
+              // Higher confidence for ISO dates and dates with month names
+              let confidence = 5;
+              if (pattern.source.includes('\\d{4}-\\d{2}-\\d{2}')) {
+                confidence = 8; // ISO format is reliable
+              } else if (pattern.source.includes('January|February')) {
+                confidence = 7; // Month names are reliable
+              }
+              
+              dateCandidates.push({ date: dateStr, confidence });
+            }
           }
         }
       } catch (error) {
         this.logger.warn(`Error with date pattern ${pattern.source}: ${error.message}`);
       }
     }
+    
+    // Return the date with highest confidence, or first valid date if all equal
+    if (dateCandidates.length > 0) {
+      dateCandidates.sort((a, b) => b.confidence - a.confidence);
+      const bestDate = dateCandidates[0].date;
+      this.logger.debug(`Extracted ${type} date: ${bestDate} using general pattern (confidence: ${dateCandidates[0].confidence})`);
+      return bestDate;
+    }
 
     this.logger.debug(`Could not extract ${type} date from text`);
+    this.logger.debug(`Text sample (first 500 chars): ${text.substring(0, 500)}`);
     return undefined;
   }
 
@@ -618,44 +718,101 @@ export class InvoicesParserService {
           date = new Date(cleaned);
         }
       } else if (cleaned.includes('-')) {
-        // ISO format or DD-MM-YYYY
-        const parts = cleaned.split('-');
-        if (parts[0].length === 4) {
-          // YYYY-MM-DD
-          date = new Date(cleaned);
+        // ISO format or DD-MM-YYYY or MM-DD-YYYY
+        const parts = cleaned.split('-').map(p => p.trim());
+        if (parts.length === 3) {
+          if (parts[0].length === 4) {
+            // YYYY-MM-DD
+            date = new Date(cleaned);
+          } else {
+            // Handle 2-digit years
+            let year = parseInt(parts[2], 10);
+            if (year < 100) {
+              year = year < 50 ? 2000 + year : 1900 + year;
+            }
+            
+            const day = parseInt(parts[0], 10);
+            const month = parseInt(parts[1], 10);
+            
+            // If day > 12, it's DD-MM-YYYY, otherwise try both
+            if (day > 12 && day <= 31) {
+              // DD-MM-YYYY
+              date = new Date(`${year}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`);
+            } else {
+              // Try MM-DD-YYYY first, then DD-MM-YYYY
+              date = new Date(`${year}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}`);
+              if (isNaN(date.getTime())) {
+                date = new Date(`${year}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`);
+              }
+            }
+          }
         } else {
-          // DD-MM-YYYY -> YYYY-MM-DD
-          date = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+          date = new Date(cleaned);
         }
       } else if (cleaned.includes('/')) {
         // MM/DD/YYYY or DD/MM/YYYY
-        const parts = cleaned.split('/');
-        if (parts.length === 3 && parts[0].length <= 2 && parts[2].length === 4) {
-          // Try DD/MM/YYYY first (common in India/Europe), then MM/DD/YYYY
-          // If day > 12, it's definitely DD/MM/YYYY
+        const parts = cleaned.split('/').map(p => p.trim());
+        if (parts.length === 3) {
+          // Handle 2-digit years (assume 20xx if < 50, else 19xx)
+          let year = parseInt(parts[2], 10);
+          if (year < 100) {
+            year = year < 50 ? 2000 + year : 1900 + year;
+          }
+          
+          if (parts[0].length <= 2 && parts[1].length <= 2) {
+            // Try DD/MM/YYYY first (common in India/Europe), then MM/DD/YYYY
+            // If day > 12, it's definitely DD/MM/YYYY
+            const day = parseInt(parts[0], 10);
+            const month = parseInt(parts[1], 10);
+
+            if (day > 12 && day <= 31) {
+              // Definitely DD/MM/YYYY
+              date = new Date(
+                `${year}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`,
+              );
+            } else if (month > 12 && month <= 31) {
+              // Definitely MM/DD/YYYY (swapped)
+              date = new Date(
+                `${year}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}`,
+              );
+            } else {
+              // Ambiguous - try DD/MM/YYYY first (more common internationally)
+              date = new Date(
+                `${year}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`,
+              );
+              // If invalid, try MM/DD/YYYY
+              if (isNaN(date.getTime()) || date.getDate() !== day) {
+                date = new Date(
+                  `${year}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}`,
+                );
+              }
+            }
+          } else {
+            date = new Date(cleaned);
+          }
+        } else {
+          date = new Date(cleaned);
+        }
+      } else if (cleaned.includes('.')) {
+        // DD.MM.YYYY or MM.DD.YYYY (dot format)
+        const parts = cleaned.split('.').map(p => p.trim());
+        if (parts.length === 3) {
+          let year = parseInt(parts[2], 10);
+          if (year < 100) {
+            year = year < 50 ? 2000 + year : 1900 + year;
+          }
+          
           const day = parseInt(parts[0], 10);
           const month = parseInt(parts[1], 10);
-
-          if (day > 12) {
-            // Definitely DD/MM/YYYY
-            date = new Date(
-              `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`,
-            );
-          } else if (month > 12) {
-            // Definitely MM/DD/YYYY
-            date = new Date(
-              `${parts[2]}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}`,
-            );
+          
+          if (day > 12 && day <= 31) {
+            // DD.MM.YYYY
+            date = new Date(`${year}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`);
           } else {
-            // Ambiguous - try DD/MM/YYYY first (more common internationally)
-            date = new Date(
-              `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`,
-            );
-            // If invalid, try MM/DD/YYYY
+            // Try MM.DD.YYYY first, then DD.MM.YYYY
+            date = new Date(`${year}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}`);
             if (isNaN(date.getTime())) {
-              date = new Date(
-                `${parts[2]}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}`,
-              );
+              date = new Date(`${year}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`);
             }
           }
         } else {
@@ -787,20 +944,56 @@ export class InvoicesParserService {
       throw new Error('OpenAI client not initialized');
     }
 
-    const prompt = `Extract invoice information from the following text. Return a JSON object with these fields: invoiceNumber, amount (as number, not string), currency, provider, billingDate (YYYY-MM-DD format), dueDate (YYYY-MM-DD format), category.
+    const prompt = `You are an expert invoice parser. Extract the following information from this invoice text and return ONLY a valid JSON object.
 
-IMPORTANT:
-- For invoiceNumber, look for patterns like: INV-2024-001, Invoice #12345, Bill Number: BILL-001, etc.
-- For amount: Extract as a NUMBER (not string), remove currency symbols and commas. Example: "₹1,234.56" should be 1234.56
-- For currency: Always use USD. The website uses dollars only.
-- Amount must be a valid positive number with up to 2 decimal places.
+REQUIRED FIELDS (use null if not found):
+{
+  "invoiceNumber": "string or null",
+  "amount": number (not string, no quotes),
+  "currency": "USD" (always USD),
+  "provider": "string or null",
+  "billingDate": "YYYY-MM-DD format or null",
+  "dueDate": "YYYY-MM-DD format or null",
+  "category": "string or null"
+}
 
-Text to parse:
-${text.substring(0, 4000)} ${text.length > 4000 ? '...' : ''}
+CRITICAL EXTRACTION RULES:
+
+1. AMOUNT (MOST IMPORTANT):
+   - Look for: "Total", "Amount", "Balance", "Due", "Grand Total", "Invoice Amount", "Payable", "Amount Due"
+   - Extract the LARGEST amount if multiple found (this is usually the total)
+   - Remove ALL currency symbols ($, ₹, €, £, ¥) and commas
+   - Convert to pure number: "₹1,234.56" → 1234.56, "$5,000.00" → 5000.00
+   - Handle formats: "1,234.56", "1234.56", "1 234.56", "$1,234.56", "USD 1,234.56"
+   - Amount MUST be a number (not string) in JSON
+   - If multiple amounts found, choose the one labeled as "Total", "Amount Due", or "Grand Total"
+
+2. DATES (CRITICAL):
+   - Billing Date: Look for "Invoice Date", "Billing Date", "Date of Invoice", "Issue Date", "Bill Date", "Invoice Issued"
+   - Due Date: Look for "Due Date", "Payment Due", "Pay By", "Due By", "Payment Due Date", "Amount Due By"
+   - Accept formats: "12/20/2024", "20/12/2024", "2024-12-20", "December 20, 2024", "20-Dec-2024", "12.20.2024"
+   - Convert ALL dates to YYYY-MM-DD format
+   - For ambiguous dates (12/20/2024), prefer DD/MM/YYYY if day > 12, otherwise try both formats
+   - If year is 2 digits (24), assume 2024 if < 50, else 1924
+   - Dates must be valid calendar dates
+
+3. INVOICE NUMBER:
+   - Look for: "Invoice Number", "Invoice #", "Invoice No", "Bill Number", "Reference", "Invoice ID"
+   - Patterns: INV-2024-001, #12345, BILL-001, etc.
+
+4. PROVIDER:
+   - Extract company/vendor name from "From:", "Vendor:", "Billed By:", or invoice header
+   - Common providers: AWS, Azure, Google Cloud, GitHub, Stripe, etc.
+
+5. CURRENCY:
+   - Always return "USD" regardless of invoice currency
+
+Invoice Text:
+${text.substring(0, 6000)} ${text.length > 6000 ? '... (truncated)' : ''}
 
 Filename: ${filename}
 
-Return only valid JSON, no additional text. If a field cannot be determined, use null for that field.`;
+Return ONLY valid JSON. No explanations, no markdown, just the JSON object.`;
 
     try {
       const response = await this.openaiClient.chat.completions.create({
@@ -809,15 +1002,15 @@ Return only valid JSON, no additional text. If a field cannot be determined, use
           {
             role: 'system',
             content:
-              'You are an expert at extracting structured data from invoices. Always return valid JSON only.',
+              'You are an expert invoice parser. Extract invoice data with high accuracy, especially for amounts and dates. Always return valid JSON only. Amount must be a number (not string). Dates must be in YYYY-MM-DD format.',
           },
           {
             role: 'user',
             content: prompt,
           },
         ],
-        temperature: 0.1, // Low temperature for consistent extraction
-        max_tokens: 500,
+        temperature: 0, // Zero temperature for maximum consistency
+        max_tokens: 800, // Increased for more detailed responses
         response_format: { type: 'json_object' },
       });
 
@@ -879,13 +1072,44 @@ Return only valid JSON, no additional text. If a field cannot be determined, use
         // Default to USD if no currency detected
         result.currency = 'USD';
       }
-      if (parsed.provider) result.provider = String(parsed.provider);
-      if (parsed.billingDate)
-        result.billingDate =
-          this.normalizeDate(String(parsed.billingDate)) || String(parsed.billingDate);
-      if (parsed.dueDate)
-        result.dueDate = this.normalizeDate(String(parsed.dueDate)) || String(parsed.dueDate);
-      if (parsed.category) result.category = String(parsed.category);
+      if (parsed.provider) {
+        result.provider = String(parsed.provider).trim();
+      }
+      
+      // Normalize dates - OpenAI should return YYYY-MM-DD, but normalize just in case
+      if (parsed.billingDate) {
+        const normalized = this.normalizeDate(String(parsed.billingDate));
+        if (normalized) {
+          result.billingDate = normalized;
+        } else {
+          // If normalization failed, try to use as-is if it's already in YYYY-MM-DD format
+          const dateStr = String(parsed.billingDate).trim();
+          if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+            result.billingDate = dateStr;
+          } else {
+            this.logger.warn(`Could not normalize billing date from OpenAI: ${dateStr}`);
+          }
+        }
+      }
+      
+      if (parsed.dueDate) {
+        const normalized = this.normalizeDate(String(parsed.dueDate));
+        if (normalized) {
+          result.dueDate = normalized;
+        } else {
+          // If normalization failed, try to use as-is if it's already in YYYY-MM-DD format
+          const dateStr = String(parsed.dueDate).trim();
+          if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+            result.dueDate = dateStr;
+          } else {
+            this.logger.warn(`Could not normalize due date from OpenAI: ${dateStr}`);
+          }
+        }
+      }
+      
+      if (parsed.category) {
+        result.category = String(parsed.category).trim();
+      }
 
       return result;
     } catch (error) {

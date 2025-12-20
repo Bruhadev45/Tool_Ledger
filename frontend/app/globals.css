@@ -57,3 +57,16 @@
     @apply bg-background text-foreground;
   }
 }
+
+@layer utilities {
+  /* Remove blue border and ring on input focus - applies to all input fields globally */
+  input:focus,
+  textarea:focus,
+  select:focus {
+    border-color: rgb(209, 213, 219) !important; /* Keep gray-300 border on focus */
+    outline: none !important;
+    --tw-ring-color: transparent !important;
+    --tw-ring-offset-width: 0px !important;
+    box-shadow: none !important;
+  }
+}
