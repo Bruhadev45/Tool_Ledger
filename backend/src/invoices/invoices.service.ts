@@ -176,7 +176,9 @@ export class InvoicesService {
       endDate?: Date;
     },
   ) {
-    const where: any = { organizationId };
+    // Admins can see all invoices across all organizations
+    // Accountants can only see approved invoices from their organization uploaded by admins
+    const where: any = userRole === UserRole.ADMIN ? {} : { organizationId };
 
     // Accountants can only see approved invoices uploaded by admins
     if (userRole === UserRole.ACCOUNTANT) {
@@ -224,6 +226,13 @@ export class InvoicesService {
             lastName: true,
           },
         },
+        organization: {
+          select: {
+            id: true,
+            name: true,
+            domain: true,
+          },
+        },
         credentialLinks: {
           include: {
             credential: {
@@ -240,11 +249,14 @@ export class InvoicesService {
   }
 
   async findOne(id: string, organizationId: string, userRole: UserRole) {
+    // Admins can see invoices from any organization
+    const whereClause: any = { id };
+    if (userRole !== UserRole.ADMIN) {
+      whereClause.organizationId = organizationId;
+    }
+
     const invoice = await this.prisma.invoice.findFirst({
-      where: {
-        id,
-        organizationId,
-      },
+      where: whereClause,
       include: {
         uploadedBy: {
           select: {
@@ -260,6 +272,13 @@ export class InvoicesService {
             email: true,
             firstName: true,
             lastName: true,
+          },
+        },
+        organization: {
+          select: {
+            id: true,
+            name: true,
+            domain: true,
           },
         },
         credentialLinks: {
