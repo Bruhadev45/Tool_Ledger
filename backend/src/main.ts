@@ -103,7 +103,7 @@ async function bootstrap() {
 
   // Start the server on configured port
   // Railway provides PORT env var, default to 8080 if not set
-  await app.listen(port);
+  await app.listen(port, '0.0.0.0');
 
   // Log server startup information
   const logger = new Logger('Bootstrap');
