@@ -38,10 +38,22 @@ async function main() {
   console.log('🌱 Seeding database...');
 
   // Get encryption key from environment
-  const encryptionKey = process.env.ENCRYPTION_KEY || 'default-seed-key-32bytes!!';
+  const encryptionKey = process.env.ENCRYPTION_KEY || 'default-seed-key-32bytes-long!!!';
   if (!process.env.ENCRYPTION_KEY) {
     console.warn('⚠️  ENCRYPTION_KEY not found in environment. Using default seed key.');
     console.warn('   Note: In production, always set ENCRYPTION_KEY in your .env file.');
+  }
+  
+  // Validate encryption key early
+  try {
+    // Test the encryption key with a dummy value
+    encrypt('test', encryptionKey);
+  } catch (error) {
+    console.error('❌ Invalid ENCRYPTION_KEY configuration.');
+    console.error('   The ENCRYPTION_KEY must be exactly 32 bytes.');
+    console.error('   Generate a valid key with: openssl rand -base64 32');
+    console.error('   Or use: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'base64\'))"');
+    throw error;
   }
 
   // Create organization
