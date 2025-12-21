@@ -1,13 +1,15 @@
-import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(PrismaService.name);
+
   async onModuleInit() {
     try {
       await this.$connect();
     } catch (error) {
-      console.error('Failed to connect to Prisma on startup:', error);
+      this.logger.error('Failed to connect to Prisma on startup:', error);
       // Don't throw here to allow the app to start and respond to healthchecks
     }
   }

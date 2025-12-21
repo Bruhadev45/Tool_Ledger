@@ -13,6 +13,7 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
@@ -21,6 +22,8 @@ import { CreateInvoiceDto, UpdateInvoiceDto, ApproveInvoiceDto } from './dto';
 
 @Injectable()
 export class InvoicesService {
+  private readonly logger = new Logger(InvoicesService.name);
+
   constructor(
     private prisma: PrismaService,
     private storageService: StorageService,
@@ -472,7 +475,7 @@ export class InvoicesService {
         await this.storageService.deleteFile(invoice.fileUrl);
       } catch (error) {
         // Log but don't fail - file might already be deleted
-        console.error('Failed to delete invoice file:', error);
+        this.logger.warn('Failed to delete invoice file:', error);
       }
     }
 

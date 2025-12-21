@@ -16,8 +16,30 @@ export class AuditLogService {
     userAgent?: string;
     metadata?: any; // Json type accepts objects or JSON strings
   }) {
+    // Build data object, omitting undefined fields
+    const createData: any = {
+      action: data.action,
+      resourceType: data.resourceType,
+      userId: data.userId,
+      organizationId: data.organizationId,
+    };
+
+    // Only include optional fields if they have values
+    if (data.resourceId !== undefined && data.resourceId !== null) {
+      createData.resourceId = data.resourceId;
+    }
+    if (data.ipAddress) {
+      createData.ipAddress = data.ipAddress;
+    }
+    if (data.userAgent) {
+      createData.userAgent = data.userAgent;
+    }
+    if (data.metadata !== undefined) {
+      createData.metadata = data.metadata;
+    }
+
     return this.prisma.auditLog.create({
-      data,
+      data: createData,
     });
   }
 

@@ -649,27 +649,32 @@ async function main() {
   if (existingAuditLogs > 0) {
     console.log(`   ⏩ Skipping - ${existingAuditLogs} audit logs already exist`);
   } else if (invoices.length >= 1) {
+    // Create audit logs with proper field handling
+    const auditLogData = [
+      {
+        action: AuditAction.UPLOAD,
+        resourceType: 'invoice',
+        resourceId: invoices[0].id,
+        userId: admin1.id,
+        organizationId: organization.id,
+        ipAddress: '192.168.1.100',
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+        metadata: { invoiceNumber: invoices[0].invoiceNumber },
+      },
+      {
+        action: AuditAction.APPROVE,
+        resourceType: 'invoice',
+        resourceId: invoices[0].id,
+        userId: admin1.id,
+        organizationId: organization.id,
+        ipAddress: '192.168.1.100',
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+        metadata: { invoiceNumber: invoices[0].invoiceNumber },
+      },
+    ];
+
     await prisma.auditLog.createMany({
-      data: [
-        {
-          action: AuditAction.UPLOAD,
-          resourceType: 'invoice',
-          resourceId: invoices[0].id,
-          userId: admin1.id,
-          organizationId: organization.id,
-          ipAddress: '192.168.1.100',
-          metadata: { invoiceNumber: invoices[0].invoiceNumber },
-        },
-        {
-          action: AuditAction.APPROVE,
-          resourceType: 'invoice',
-          resourceId: invoices[0].id,
-          userId: admin1.id,
-          organizationId: organization.id,
-          ipAddress: '192.168.1.100',
-          metadata: { invoiceNumber: invoices[0].invoiceNumber },
-        },
-      ],
+      data: auditLogData,
     });
     console.log('✅ Created audit logs');
   }
