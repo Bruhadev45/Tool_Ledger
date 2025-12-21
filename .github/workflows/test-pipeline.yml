@@ -157,6 +157,7 @@ jobs:
           npx prisma db seed
         env:
           DATABASE_URL: postgresql://test:test@localhost:5432/test
+          ENCRYPTION_KEY: v8N3Zp9W4rK2mL6bQx5Yt7G1vS0uJ9n4
 
       - name: Build and Start Backend
         working-directory: backend
