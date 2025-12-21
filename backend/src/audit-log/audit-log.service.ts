@@ -9,12 +9,12 @@ export class AuditLogService {
   async create(data: {
     action: AuditAction;
     resourceType: string;
-    resourceId: string;
+    resourceId?: string | null;
     userId: string;
     organizationId: string;
     ipAddress?: string;
     userAgent?: string;
-    metadata?: string;
+    metadata?: any; // Json type accepts objects or JSON strings
   }) {
     return this.prisma.auditLog.create({
       data,

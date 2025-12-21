@@ -658,7 +658,7 @@ async function main() {
           userId: admin1.id,
           organizationId: organization.id,
           ipAddress: '192.168.1.100',
-          metadata: JSON.stringify({ invoiceNumber: invoices[0].invoiceNumber }),
+          metadata: { invoiceNumber: invoices[0].invoiceNumber },
         },
         {
           action: AuditAction.APPROVE,
@@ -667,7 +667,7 @@ async function main() {
           userId: admin1.id,
           organizationId: organization.id,
           ipAddress: '192.168.1.100',
-          metadata: JSON.stringify({ invoiceNumber: invoices[0].invoiceNumber }),
+          metadata: { invoiceNumber: invoices[0].invoiceNumber },
         },
       ],
     });

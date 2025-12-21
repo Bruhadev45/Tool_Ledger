@@ -84,28 +84,28 @@ model Team {
 
 // Users
 model User {
-  id             String    @id @default(uuid())
-  email          String    @unique
-  passwordHash   String
-  firstName      String
-  lastName       String
-  role           UserRole  @default(USER)
-  organizationId String
-  teamId         String? // Optional team membership
+  id              String             @id @default(uuid())
+  email           String             @unique
+  passwordHash    String
+  firstName       String
+  lastName        String
+  role            UserRole           @default(USER)
+  organizationId  String
+  teamId          String? // Optional team membership
   assignedAdminId String? // Admin assigned to manage this user (for admin-user hierarchy)
-  approvalStatus UserApprovalStatus @default(PENDING_APPROVAL) // Registration approval status
-  mfaEnabled     Boolean   @default(false)
-  mfaSecret      String? // TOTP secret (encrypted)
-  mfaBackupCodes String? // JSON array of backup codes
-  isActive       Boolean   @default(true)
-  lastLoginAt    DateTime?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  approvalStatus  UserApprovalStatus @default(PENDING_APPROVAL) // Registration approval status
+  mfaEnabled      Boolean            @default(false)
+  mfaSecret       String? // TOTP secret (encrypted)
+  mfaBackupCodes  String? // JSON array of backup codes
+  isActive        Boolean            @default(true)
+  lastLoginAt     DateTime?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  team         Team?        @relation(fields: [teamId], references: [id], onDelete: SetNull)
-  assignedAdmin User?       @relation("AdminUserHierarchy", fields: [assignedAdminId], references: [id], onDelete: SetNull)
-  managedUsers  User[]      @relation("AdminUserHierarchy") // Users assigned to this admin
+  organization  Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  team          Team?        @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  assignedAdmin User?        @relation("AdminUserHierarchy", fields: [assignedAdminId], references: [id], onDelete: SetNull)
+  managedUsers  User[]       @relation("AdminUserHierarchy") // Users assigned to this admin
 
   ownedCredentials  Credential[]      @relation("CredentialOwner")
   sharedCredentials CredentialShare[]
@@ -306,18 +306,19 @@ model AuditLog {
   id             String      @id @default(uuid())
   action         AuditAction
   resourceType   String // "credential", "invoice", "user", etc.
-  resourceId     String // Generic resource ID (for polymorphic relation)
+  resourceId     String? // Generic resource ID (for polymorphic relation) - optional
   userId         String
   organizationId String
   ipAddress      String?
   userAgent      String?
-  metadata       String? // JSON for additional context
+  metadata       Json? // JSON for additional context
   createdAt      DateTime    @default(now())
 
   user         User         @relation(fields: [userId], references: [id])
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   // Polymorphic relations - use resourceType + resourceId in application code
   // Direct foreign keys removed to avoid constraint conflicts
+  // resourceId is optional to support audit logs without specific resource references
 
   @@index([organizationId, createdAt])
   @@index([userId, createdAt])
