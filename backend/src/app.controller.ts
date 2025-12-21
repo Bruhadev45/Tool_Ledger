@@ -1,7 +1,8 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Logger } from '@nestjs/common';
 
 @Controller()
 export class AppController {
+  private readonly logger = new Logger(AppController.name);
   @Get()
   getRoot() {
     return {
@@ -19,7 +20,7 @@ export class AppController {
 
   @Get('health')
   getHealth() {
-    console.log('Healthcheck endpoint hit');
+    this.logger.log('Health check endpoint hit');
     return {
       status: 'ok',
       timestamp: new Date().toISOString(),
