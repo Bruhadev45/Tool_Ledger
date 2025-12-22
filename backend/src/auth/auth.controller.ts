@@ -118,16 +118,6 @@ export class AuthController {
       throw new UnauthorizedException('MFA token must be at least 6 digits');
     }
 
-    // Temporary bypass for testing - REMOVE IN PRODUCTION
-    // Allows testing MFA flow without authenticator app
-    if (cleanToken === '000000') {
-      const user = await this.authService.getUserById(verifyDto.userId);
-      if (!user) {
-        throw new UnauthorizedException('User not found');
-      }
-      return this.authService.login(user);
-    }
-
     // Verify MFA token (checks both TOTP and backup codes)
     const isValid = await this.authService.verifyMFAForLogin(verifyDto.userId, cleanToken);
 

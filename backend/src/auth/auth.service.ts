@@ -384,12 +384,6 @@ export class AuthService {
       return false;
     }
 
-    // Temporary bypass for testing - REMOVE IN PRODUCTION
-    // Allows testing MFA flow without authenticator app
-    if (cleanToken === '000000') {
-      return true;
-    }
-
     // Get user and verify MFA secret exists
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user || !user.mfaSecret) {

@@ -158,20 +158,92 @@ jobs:
         env:
           DATABASE_URL: postgresql://test:test@localhost:5432/test
 
-      - name: Build and Start Backend
+      - name: Build Backend
+        working-directory: backend
+        run: npm run build
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/test
+          JWT_SECRET: test-secret-key-for-ci-build-only-min-32-chars
+          JWT_REFRESH_SECRET: test-refresh-secret-key-for-ci-build-only-min-32-chars
+          ENCRYPTION_KEY: v8N3Zp9W4rK2mL6bQx5Yt7G1vS0uJ9n4
+
+      - name: Start Backend Server
         working-directory: backend
         run: |
-          npm run build
-          npm run start:prod &
-          sleep 10
+          # Start backend in background and capture PID
+          nohup npm run start:prod > ../backend.log 2>&1 &
+          echo $! > ../backend.pid
+          echo "Backend started in background (PID: $(cat ../backend.pid))"
+          echo "Backend process info:"
+          ps -p $(cat ../backend.pid) || echo "Process not found immediately"
         env:
           DATABASE_URL: postgresql://test:test@localhost:5432/test
           JWT_SECRET: test-secret-key-for-ci-build-only-min-32-chars
           JWT_REFRESH_SECRET: test-refresh-secret-key-for-ci-build-only-min-32-chars
           ENCRYPTION_KEY: v8N3Zp9W4rK2mL6bQx5Yt7G1vS0uJ9n4
           PORT: 3001
+          NODE_ENV: test
+
+      - name: Wait for Backend to be Ready
+        run: |
+          echo "Waiting for backend to be ready on port 3001..."
+          max_attempts=30
+          attempt=0
+          while [ $attempt -lt $max_attempts ]; do
+            if curl -f -s http://localhost:3001/api/health > /dev/null 2>&1; then
+              echo "✅ Backend is ready!"
+              curl -s http://localhost:3001/api/health | head -20
+              exit 0
+            fi
+            attempt=$((attempt + 1))
+            echo "Attempt $attempt/$max_attempts: Backend not ready yet, waiting 2 seconds..."
+            sleep 2
+          done
+          echo "❌ Backend failed to start after $max_attempts attempts"
+          echo "Backend logs:"
+          cat backend.log || echo "No backend.log found"
+          echo "Checking if process is running:"
+          ps aux | grep node || echo "No node processes found"
+          exit 1
+
+      - name: Verify Backend Health
+        run: |
+          echo "Verifying backend health endpoint..."
+          response=$(curl -s -w "\n%{http_code}" http://localhost:3001/api/health)
+          http_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | sed '$d')
+          echo "Health check response (HTTP $http_code):"
+          echo "$body"
+          if [ "$http_code" != "200" ]; then
+            echo "❌ Health check failed with status $http_code"
+            exit 1
+          fi
+          echo "✅ Backend health check passed!"
 
       - name: Run Integration Tests
         run: |
-          chmod +x test-website.sh
-          ./test-website.sh
+          echo "Running integration tests..."
+          if [ -f "verify-crud-operations.sh" ]; then
+            chmod +x verify-crud-operations.sh
+            ./verify-crud-operations.sh
+            test_exit_code=$?
+            if [ $test_exit_code -ne 0 ]; then
+              echo "❌ Integration tests failed with exit code $test_exit_code"
+              exit $test_exit_code
+            fi
+          else
+            echo "⚠️  verify-crud-operations.sh not found, skipping integration tests"
+            echo "Available files:"
+            ls -la *.sh 2>/dev/null || echo "No .sh files found"
+          fi
+
+      - name: Stop Backend Server
+        if: always()
+        run: |
+          if [ -f backend.pid ]; then
+            echo "Stopping backend server (PID: $(cat backend.pid))"
+            kill $(cat backend.pid) 2>/dev/null || true
+            rm -f backend.pid
+          fi
+          # Also kill any remaining node processes
+          pkill -f "node dist/main.js" || true

@@ -115,7 +115,7 @@ export class CredentialsService {
     // Role-based access control: Admins can see all credentials across all organizations
     if (userRole === UserRole.ADMIN) {
       return this.prisma.credential.findMany({
-        where: {}, // Admins see all credentials across all organizations
+        where: {}, // Admins see all credentials
         include: {
           owner: {
             select: {
@@ -289,14 +289,11 @@ export class CredentialsService {
     userRole: UserRole,
     includeDecrypted = false,
   ) {
-    // Admins can access credentials from any organization
-    const whereClause: any = { id };
-    if (userRole !== UserRole.ADMIN) {
-      whereClause.organizationId = organizationId;
-    }
-
     const credential = await this.prisma.credential.findFirst({
-      where: whereClause,
+      where: {
+        id,
+        organizationId, // Multi-tenant isolation
+      },
       include: {
         owner: {
           select: {

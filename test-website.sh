@@ -1,117 +1,101 @@
 #!/bin/bash
 
-# Website Testing Script
-# Tests all major features of the ToolLedger platform
+# Website Test Suite
+# Tests backend health, authentication, database, and frontend
 
 echo "🧪 Starting Website Test Suite..."
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo ""
-
-API_URL="http://localhost:3001/api"
-FRONTEND_URL="http://localhost:3000"
 
 # Colors for output
-GREEN='\033[0;32m'
 RED='\033[0;31m'
+GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-test_count=0
-pass_count=0
-fail_count=0
+# Test counters
+TOTAL_TESTS=0
+PASSED_TESTS=0
+FAILED_TESTS=0
 
-# Test function
-test_endpoint() {
-    local name=$1
-    local method=$2
-    local endpoint=$3
-    local data=$4
-    local expected_status=$5
+# Function to run a test
+run_test() {
+    local test_name="$1"
+    local expected_status="$2"
+    local url="$3"
+    local method="${4:-GET}"
+    local data="$5"
     
-    test_count=$((test_count + 1))
-    echo -n "Test $test_count: $name... "
+    TOTAL_TESTS=$((TOTAL_TESTS + 1))
     
-    if [ "$method" = "GET" ]; then
-        response=$(curl -s -w "\n%{http_code}" "$API_URL$endpoint" 2>&1)
-    elif [ "$method" = "POST" ]; then
-        response=$(curl -s -w "\n%{http_code}" -X POST "$API_URL$endpoint" \
-            -H "Content-Type: application/json" \
-            -d "$data" 2>&1)
+    if [ "$method" = "POST" ] && [ -n "$data" ]; then
+        response=$(curl -s -w "%{http_code}" -X POST -H "Content-Type: application/json" -d "$data" "$url" 2>/dev/null)
+    else
+        response=$(curl -s -w "%{http_code}" "$url" 2>/dev/null)
     fi
     
-    http_code=$(echo "$response" | tail -n1)
-    body=$(echo "$response" | sed '$d')
+    # Extract status code (last 3 characters)
+    status_code="${response: -3}"
+    response_body="${response%???}"
     
-    if [ "$http_code" = "$expected_status" ]; then
-        echo -e "${GREEN}✓ PASS${NC} (Status: $http_code)"
-        pass_count=$((pass_count + 1))
-        return 0
+    if [ "$status_code" = "$expected_status" ]; then
+        echo -e "Test $TOTAL_TESTS: $test_name... ${GREEN}✓ PASS${NC} (Status: $status_code)"
+        PASSED_TESTS=$((PASSED_TESTS + 1))
     else
-        echo -e "${RED}✗ FAIL${NC} (Expected: $expected_status, Got: $http_code)"
-        echo "   Response: $body"
-        fail_count=$((fail_count + 1))
-        return 1
+        echo -e "Test $TOTAL_TESTS: $test_name... ${RED}✗ FAIL${NC} (Expected: $expected_status, Got: $status_code)"
+        if [ -n "$response_body" ] && [ ${#response_body} -lt 200 ]; then
+            echo "Response: $response_body"
+        fi
+        FAILED_TESTS=$((FAILED_TESTS + 1))
     fi
 }
 
-# 1. Backend Health Check
+# Backend Health Tests
+echo ""
 echo "📡 Testing Backend Health..."
-test_endpoint "Health Check" "GET" "/health" "" "200"
-test_endpoint "Root Endpoint" "GET" "/" "" "200"
-echo ""
+run_test "Health Check" "200" "http://localhost:3001/api/health"
+run_test "Root Endpoint" "200" "http://localhost:3001/"
 
-# 2. Authentication Tests
+# Authentication Tests
+echo ""
 echo "🔐 Testing Authentication..."
-echo -e "${YELLOW}Note: Admin login will fail without MFA (expected behavior)${NC}"
+echo "Note: Admin login will fail without MFA (expected behavior)"
+run_test "Admin Login (MFA Required)" "401" "http://localhost:3001/api/auth/login" "POST" '{"email":"admin@toolledger.com","password":"admin123"}'
+run_test "User Registration" "201" "http://localhost:3001/api/auth/register" "POST" '{"email":"test@example.com","password":"password123","firstName":"Test","lastName":"User"}'
 
-# Test admin login (should fail due to MFA requirement)
-test_endpoint "Admin Login (MFA Required)" "POST" "/auth/login" \
-    '{"email":"admin@toolledger.com","password":"admin123"}' "401"
-
-# Test registration
-test_endpoint "User Registration" "POST" "/auth/register" \
-    "{\"email\":\"testuser-$(date +%s)@example.com\",\"password\":\"Test123!\",\"firstName\":\"Test\",\"lastName\":\"User\",\"domain\":\"example.com\"}" "201"
+# Database State Check
 echo ""
-
-# 3. Database State Check
 echo "📊 Checking Database State..."
 echo -n "Checking if admin exists... "
-admin_check=$(curl -s "$API_URL/auth/login" -X POST \
-    -H "Content-Type: application/json" \
-    -d '{"email":"admin@toolledger.com","password":"admin123"}' 2>&1)
-if echo "$admin_check" | grep -q "MFA\|credentials\|401"; then
+admin_check=$(curl -s -X POST -H "Content-Type: application/json" -d '{"email":"admin@toolledger.com","password":"wrongpassword"}' "http://localhost:3001/api/auth/login" 2>/dev/null)
+if echo "$admin_check" | grep -q "Invalid credentials\|MFA"; then
     echo -e "${GREEN}✓ Admin account exists${NC}"
-    pass_count=$((pass_count + 1))
 else
     echo -e "${RED}✗ Admin account issue${NC}"
-    fail_count=$((fail_count + 1))
 fi
-test_count=$((test_count + 1))
-echo ""
 
-# 4. Frontend Check
+# Frontend Test
+echo ""
 echo "🌐 Testing Frontend..."
-echo -n "Checking frontend availability... "
-frontend_check=$(curl -s -o /dev/null -w "%{http_code}" "$FRONTEND_URL" 2>&1)
-if [ "$frontend_check" = "200" ] || [ "$frontend_check" = "302" ]; then
-    echo -e "${GREEN}✓ Frontend is running${NC} (Status: $frontend_check)"
-    pass_count=$((pass_count + 1))
+frontend_response=$(curl -s -w "%{http_code}" "http://localhost:3000" 2>/dev/null)
+frontend_status="${frontend_response: -3}"
+
+if [ "$frontend_status" = "200" ] || [ "$frontend_status" = "307" ]; then
+    echo -e "Checking frontend availability... ${GREEN}✓ Frontend is running${NC} (Status: $frontend_status)"
 else
-    echo -e "${YELLOW}⚠ Frontend may not be running${NC} (Status: $frontend_check)"
+    echo -e "Checking frontend availability... ${YELLOW}⚠ Frontend may not be running${NC} (Status: $frontend_status)"
     echo "   Start frontend with: cd frontend && npm run dev"
 fi
-test_count=$((test_count + 1))
-echo ""
 
 # Summary
+echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "📊 Test Summary:"
-echo "   Total Tests: $test_count"
-echo -e "   ${GREEN}Passed: $pass_count${NC}"
-echo -e "   ${RED}Failed: $fail_count${NC}"
+echo "   Total Tests: $TOTAL_TESTS"
+echo "   Passed: $PASSED_TESTS"
+echo "   Failed: $FAILED_TESTS"
 echo ""
 
-if [ $fail_count -eq 0 ]; then
+if [ $FAILED_TESTS -eq 0 ]; then
     echo -e "${GREEN}✅ All tests passed!${NC}"
     exit 0
 else

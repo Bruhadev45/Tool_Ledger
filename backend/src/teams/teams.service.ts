@@ -22,32 +22,22 @@ export class TeamsService {
   constructor(private prisma: PrismaService) {}
 
   /**
-   * Get all teams in an organization (or all teams for admins)
+   * Get all teams in an organization
    *
    * Returns list of teams with member counts. Used for team selection
-   * in credential sharing and user management. Admins can see all teams
-   * across all organizations.
+   * in credential sharing and user management.
    *
    * @param organizationId - ID of the organization (multi-tenant isolation)
-   * @param userRole - Role of the user requesting teams
    * @returns Array of team objects with member counts
    */
   async findAll(organizationId: string, userRole?: UserRole) {
     // Admins can see all teams across all organizations
     const whereClause = userRole === UserRole.ADMIN ? {} : { organizationId };
-
     return this.prisma.team.findMany({
       where: whereClause,
       include: {
         _count: {
           select: { users: true }, // Include member count
-        },
-        organization: {
-          select: {
-            id: true,
-            name: true,
-            domain: true,
-          },
         },
       },
       orderBy: { name: 'asc' },
@@ -57,24 +47,17 @@ export class TeamsService {
   /**
    * Get a single team by ID
    *
-   * Returns team details including all members. Admins can view teams
-   * from any organization.
+   * Returns team details including all members. Enforces multi-tenant
+   * isolation by verifying team belongs to organization.
    *
    * @param id - Team ID
    * @param organizationId - ID of the organization (multi-tenant isolation)
-   * @param userRole - Role of the user requesting team details
    * @returns Team object with members and member count
    * @throws NotFoundException if team not found or not in organization
    */
-  async findOne(id: string, organizationId: string, userRole?: UserRole) {
-    // Admins can view teams from any organization
-    const whereClause: any = { id };
-    if (userRole !== UserRole.ADMIN) {
-      whereClause.organizationId = organizationId;
-    }
-
+  async findOne(id: string, organizationId: string) {
     const team = await this.prisma.team.findFirst({
-      where: whereClause,
+      where: { id, organizationId }, // Multi-tenant isolation
       include: {
         users: {
           select: {
@@ -88,13 +71,6 @@ export class TeamsService {
         },
         _count: {
           select: { users: true },
-        },
-        organization: {
-          select: {
-            id: true,
-            name: true,
-            domain: true,
-          },
         },
       },
     });
@@ -228,15 +204,8 @@ export class TeamsService {
       throw new ForbiddenException('Only admins and accountants can delete teams');
     }
 
-    // Admins can delete teams from any organization
-    // Accountants can only delete teams from their own organization
-    const whereClause: any = { id };
-    if (requesterRole !== UserRole.ADMIN) {
-      whereClause.organizationId = organizationId;
-    }
-
     const team = await this.prisma.team.findFirst({
-      where: whereClause,
+      where: { id, organizationId },
     });
 
     if (!team) {
