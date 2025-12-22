@@ -19,6 +19,10 @@ const API_URL = rawApiUrl.endsWith('/api') ? rawApiUrl : `${rawApiUrl}/api`;
 // Create axios instance with base URL
 const api = axios.create({
   baseURL: API_URL,
+  timeout: 30000, // 30 second timeout
+  headers: {
+    'Content-Type': 'application/json',
+  },
 });
 
 /**
@@ -60,6 +64,30 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
+    // Handle network/connection errors
+    if (!error.response) {
+      // Network error - backend might be down
+      if (error.code === 'ECONNREFUSED' || error.message?.includes('ECONNREFUSED')) {
+        console.error('❌ Backend connection refused. Is the backend server running?');
+        return Promise.reject(new Error('Cannot connect to backend server. Please ensure it is running on http://localhost:3001'));
+      }
+      
+      if (error.code === 'ERR_NETWORK' || error.message?.includes('Network Error')) {
+        console.error('❌ Network error. Check your internet connection and backend server status.');
+        return Promise.reject(new Error('Network error. Please check your connection and ensure the backend server is running.'));
+      }
+
+      if (error.code === 'ETIMEDOUT' || error.message?.includes('timeout')) {
+        console.error('❌ Request timeout. Backend server may be slow or unresponsive.');
+        return Promise.reject(new Error('Request timeout. The backend server may be slow or unresponsive.'));
+      }
+
+      // Generic network error
+      console.error('❌ Network error:', error.message);
+      return Promise.reject(new Error('Network error. Please check your connection.'));
+    }
+
+    // Handle HTTP errors
     // If error is 401 (Unauthorized) and we haven't already retried
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true; // Prevent infinite retry loop
@@ -97,7 +125,22 @@ api.interceptors.response.use(
       }
     }
 
-    // For non-401 errors or if retry already attempted, reject with error
+    // Handle 500 errors (server errors, possibly database issues)
+    if (error.response?.status === 500) {
+      const errorMessage = error.response?.data?.message || 'Internal server error';
+      console.error('❌ Server error (500):', errorMessage);
+      if (errorMessage.toLowerCase().includes('database') || errorMessage.toLowerCase().includes('prisma')) {
+        return Promise.reject(new Error('Database connection error. Please contact support if this persists.'));
+      }
+    }
+
+    // Handle 503 errors (service unavailable)
+    if (error.response?.status === 503) {
+      console.error('❌ Service unavailable (503). Backend may be starting up or database is unavailable.');
+      return Promise.reject(new Error('Service temporarily unavailable. Please try again in a moment.'));
+    }
+
+    // For other errors, reject with the original error
     return Promise.reject(error);
   }
 );

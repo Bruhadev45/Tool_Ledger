@@ -50,9 +50,13 @@ export class AuthService {
     // Check if user registration is approved
     if (user.approvalStatus !== UserApprovalStatus.APPROVED) {
       if (user.approvalStatus === UserApprovalStatus.PENDING_APPROVAL) {
-        throw new UnauthorizedException('Your account is pending admin approval. Please contact your administrator.');
+        throw new UnauthorizedException(
+          'Your account is pending admin approval. Please contact your administrator.',
+        );
       } else if (user.approvalStatus === UserApprovalStatus.REJECTED) {
-        throw new UnauthorizedException('Your registration has been rejected. Please contact your administrator.');
+        throw new UnauthorizedException(
+          'Your registration has been rejected. Please contact your administrator.',
+        );
       }
     }
 
@@ -83,7 +87,7 @@ export class AuthService {
    *
    * Creates access token (short-lived) and refresh token (long-lived) for the user.
    * Access token contains user identity and role information.
-   * 
+   *
    * MFA is optional for all users including admins. If MFA is enabled by the user,
    * it will be required during login. Otherwise, users can login without MFA.
    *
@@ -192,7 +196,7 @@ export class AuthService {
     // Create new user account with PENDING_APPROVAL status
     // Admins and Accountants are auto-approved, regular users need approval
     const autoApprove = role === UserRole.ADMIN || role === UserRole.ACCOUNTANT;
-    
+
     const user = await this.prisma.user.create({
       data: {
         email,
@@ -201,7 +205,9 @@ export class AuthService {
         lastName,
         role,
         organizationId: organization.id,
-        approvalStatus: autoApprove ? UserApprovalStatus.APPROVED : UserApprovalStatus.PENDING_APPROVAL,
+        approvalStatus: autoApprove
+          ? UserApprovalStatus.APPROVED
+          : UserApprovalStatus.PENDING_APPROVAL,
       },
       include: { organization: true },
     });
@@ -289,7 +295,9 @@ export class AuthService {
 
       // Ensure token is actually a refresh token (not access token)
       if (payload.type !== 'refresh') {
-        this.logger.warn('Refresh token validation failed: Invalid token type', { userId: payload.sub });
+        this.logger.warn('Refresh token validation failed: Invalid token type', {
+          userId: payload.sub,
+        });
         throw new UnauthorizedException('Invalid token type');
       }
 
@@ -301,16 +309,18 @@ export class AuthService {
 
       // Check if token exists
       if (!tokenRecord) {
-        this.logger.warn('Refresh token validation failed: Token not found in database', { userId: payload.sub });
+        this.logger.warn('Refresh token validation failed: Token not found in database', {
+          userId: payload.sub,
+        });
         throw new UnauthorizedException('Invalid refresh token');
       }
 
       // Check if token hasn't expired
       if (tokenRecord.expiresAt < new Date()) {
-        this.logger.warn('Refresh token validation failed: Token expired', { 
+        this.logger.warn('Refresh token validation failed: Token expired', {
           userId: payload.sub,
           expiresAt: tokenRecord.expiresAt,
-          now: new Date()
+          now: new Date(),
         });
         throw new UnauthorizedException('Token expired');
       }
@@ -338,7 +348,10 @@ export class AuthService {
       if (error instanceof UnauthorizedException) {
         throw error;
       }
-      this.logger.error('Refresh token validation error', error instanceof Error ? error.stack : String(error));
+      this.logger.error(
+        'Refresh token validation error',
+        error instanceof Error ? error.stack : String(error),
+      );
       throw new UnauthorizedException('Invalid refresh token');
     }
   }

@@ -105,6 +105,22 @@ async function bootstrap() {
   logger.log(`📡 API Base URL: /api`);
   logger.log(`🌐 CORS Allowed Origin: ${frontendUrl || 'Not configured'}`);
   logger.log(`✅ Healthcheck available at: / and /api/health`);
+
+  // Check database connection after startup
+  try {
+    const { PrismaService } = await import('./prisma/prisma.service');
+    const prismaService = app.get(PrismaService);
+    if (prismaService && typeof (prismaService as any).isConnected === 'function') {
+      const isConnected = await (prismaService as any).isConnected();
+      if (isConnected) {
+        logger.log(`✅ Database connection: Verified`);
+      } else {
+        logger.warn(`⚠️  Database connection: Not connected`);
+      }
+    }
+  } catch (error: any) {
+    logger.warn(`⚠️  Could not verify database connection: ${error?.message || error}`);
+  }
 }
 
 // Start the application

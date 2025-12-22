@@ -4,7 +4,7 @@ import { UserRole } from '@prisma/client';
 
 /**
  * MFA Required Guard
- * 
+ *
  * Ensures that ADMIN users have MFA enabled before accessing protected routes.
  * This guard should be applied to admin-only routes to enforce MFA requirement.
  */

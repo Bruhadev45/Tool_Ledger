@@ -138,7 +138,7 @@ export class UsersService {
     // Create new user account
     // Admins and Accountants are auto-approved, regular users need approval
     const autoApprove = data.role === UserRole.ADMIN || data.role === UserRole.ACCOUNTANT;
-    
+
     const user = await this.prisma.user.create({
       data: {
         email: data.email,
@@ -149,7 +149,9 @@ export class UsersService {
         organizationId,
         teamId: data.teamId || null,
         isActive: true, // New users are active by default
-        approvalStatus: autoApprove ? UserApprovalStatus.APPROVED : UserApprovalStatus.PENDING_APPROVAL,
+        approvalStatus: autoApprove
+          ? UserApprovalStatus.APPROVED
+          : UserApprovalStatus.PENDING_APPROVAL,
       },
       select: {
         id: true,

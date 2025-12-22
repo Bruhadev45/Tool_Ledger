@@ -81,14 +81,14 @@ describe('AuthService', () => {
   describe('validateUser', () => {
     it('should return null for non-existent user', async () => {
       mockPrismaService.user.findUnique.mockResolvedValue(null);
-      
+
       try {
         await service.validateUser('test@example.com', 'password');
         fail('Expected UnauthorizedException to be thrown');
       } catch (error) {
         expect(error.message).toBe('Invalid credentials');
       }
-      
+
       expect(mockPrismaService.user.findUnique).toHaveBeenCalledWith({
         where: { email: 'test@example.com' },
         include: { organization: true },

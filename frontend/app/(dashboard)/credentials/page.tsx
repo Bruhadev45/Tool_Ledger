@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useSession } from 'next-auth/react';
 import api from '@/lib/api';
-import { Key, Plus, Filter, Trash2, Download, FileText, Share2, ArrowUp, ArrowDown, RefreshCw } from 'lucide-react';
+import { Key, Plus, Filter, Trash2, Download, FileText, Share2, ArrowUp, ArrowDown, RefreshCw, Eye } from 'lucide-react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { formatDate } from '@/lib/utils';
@@ -41,7 +41,6 @@ export default function CredentialsPage() {
         credentialsData = [];
       }
       
-      console.log('Loaded credentials:', credentialsData.length, credentialsData);
       setRawCredentials(credentialsData);
       setLastUpdated(new Date());
     } catch (error: any) {
@@ -300,87 +299,117 @@ export default function CredentialsPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-        {credentials.map((cred) => (
-          <div
-            key={cred.id}
-            className="bg-white overflow-hidden shadow-sm rounded-lg border border-gray-200 hover:shadow-md transition-shadow"
-          >
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0 w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                  <Key className="h-5 w-5 text-blue-600" />
-                </div>
-                <div className="ml-4 flex-1 min-w-0">
-                  <h3 className="text-lg font-semibold text-gray-900 truncate">{cred.name}</h3>
-                  <p className="text-sm text-gray-500 truncate">
-                    Owner: {cred.owner?.firstName} {cred.owner?.lastName} ({cred.owner?.email})
-                  </p>
-                  {isAdmin && cred.createdAt && (
-                    <p className="text-xs text-gray-400 mt-1">
-                      Created: {formatDate(cred.createdAt)}
-                    </p>
-                  )}
-                </div>
-              </div>
-              <div className="mt-4 flex flex-wrap gap-2 items-center">
-                {cred.isPaid !== undefined && (
-                  <span
-                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                      cred.isPaid
-                        ? 'bg-yellow-100 text-yellow-800'
-                        : 'bg-green-100 text-green-800'
-                    }`}
-                  >
-                    {cred.isPaid ? 'Paid' : 'Free'}
-                  </span>
-                )}
-                {cred.hasAutopay && (
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                    Autopay
-                  </span>
-                )}
-                {cred.tags && cred.tags.length > 0 && (
-                  <>
-                    {cred.tags.map((tag: string) => (
-                      <span
-                        key={tag}
-                        className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
-                      >
-                        {tag}
-                      </span>
-                    ))}
-                  </>
-                )}
-              </div>
-              <div className="mt-4 flex items-center justify-between">
-                <Link
-                  href={`/credentials/${cred.id}`}
-                  className="text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors"
-                >
-                  View Details →
-                </Link>
-                <div className="flex items-center gap-2">
-                  {cred.shares && cred.shares.length > 0 && (
-                    <div className="flex items-center gap-1 text-xs text-gray-500" title={`Shared with ${cred.shares.filter((s: any) => !s.revokedAt).length} user(s)`}>
-                      <Share2 className="h-3 w-3" />
-                      <span>{cred.shares.filter((s: any) => !s.revokedAt).length}</span>
+      <div className="bg-white shadow-sm border border-gray-200 rounded-lg overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Tool Name
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Owner
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Status & Tags
+                </th>
+                <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {credentials.map((cred) => (
+                <tr key={cred.id} className="hover:bg-gray-50 transition-colors">
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0 w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                        <Key className="h-5 w-5 text-blue-600" />
+                      </div>
+                      <div className="ml-4">
+                        <div className="text-sm font-medium text-gray-900">{cred.name}</div>
+                        {isAdmin && cred.createdAt && (
+                          <div className="text-xs text-gray-500 mt-1">
+                            Created: {formatDate(cred.createdAt)}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  )}
-                  {(isAdmin || cred.ownerId === (session?.user as any)?.id) && (
-                    <button
-                      onClick={() => handleDelete(cred.id)}
-                      className="text-red-600 hover:text-red-700 p-1 rounded-md hover:bg-red-50 transition-colors"
-                      title="Delete credential"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        ))}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm text-gray-900">
+                      {cred.owner?.firstName} {cred.owner?.lastName}
+                    </div>
+                    <div className="text-xs text-gray-500">{cred.owner?.email}</div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex flex-wrap gap-2 items-center">
+                      {cred.isPaid !== undefined && (
+                        <span
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            cred.isPaid
+                              ? 'bg-yellow-100 text-yellow-800'
+                              : 'bg-green-100 text-green-800'
+                          }`}
+                        >
+                          {cred.isPaid ? 'Paid' : 'Free'}
+                        </span>
+                      )}
+                      {cred.hasAutopay && (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                          Autopay
+                        </span>
+                      )}
+                      {cred.tags && cred.tags.length > 0 && (
+                        <>
+                          {cred.tags.slice(0, 2).map((tag: string) => (
+                            <span
+                              key={tag}
+                              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                            >
+                              {tag}
+                            </span>
+                          ))}
+                          {cred.tags.length > 2 && (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                              +{cred.tags.length - 2} more
+                            </span>
+                          )}
+                        </>
+                      )}
+                      {cred.shares && cred.shares.length > 0 && (
+                        <div className="flex items-center gap-1 text-xs text-gray-500" title={`Shared with ${cred.shares.filter((s: any) => !s.revokedAt).length} user(s)`}>
+                          <Share2 className="h-3 w-3" />
+                          <span>{cred.shares.filter((s: any) => !s.revokedAt).length}</span>
+                        </div>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <div className="flex items-center justify-end gap-2">
+                      <Link
+                        href={`/credentials/${cred.id}`}
+                        className="inline-flex items-center px-3 py-1.5 border border-blue-600 text-blue-600 rounded-md hover:bg-blue-50 transition-colors text-sm font-medium"
+                      >
+                        <Eye className="h-4 w-4 mr-1.5" />
+                        View More
+                      </Link>
+                      {(isAdmin || cred.ownerId === (session?.user as any)?.id) && (
+                        <button
+                          onClick={() => handleDelete(cred.id)}
+                          className="text-red-600 hover:text-red-700 p-1.5 rounded-md hover:bg-red-50 transition-colors"
+                          title="Delete credential"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {credentials.length === 0 && !loading && (

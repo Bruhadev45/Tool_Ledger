@@ -56,7 +56,7 @@ export class AnalyticsService {
     // For global admins, show data across ALL organizations
     // For org-specific admins, filter by organizationId
     const whereOrg = isGlobalAdmin ? {} : { organizationId };
-    
+
     const [
       credentialCount,
       totalSpend,
@@ -150,17 +150,17 @@ export class AnalyticsService {
 
       // Monthly spend (all orgs for global admin)
       this.getMonthlySpend(isGlobalAdmin ? undefined : organizationId),
-      
+
       // Total users (all orgs for global admin)
       this.prisma.user.count({
         where: whereOrg,
       }),
-      
+
       // Total teams (all orgs for global admin)
       this.prisma.team.count({
         where: whereOrg,
       }),
-      
+
       // Total organizations (only for global admin)
       isGlobalAdmin ? this.prisma.organization.count() : Promise.resolve(1),
     ]);

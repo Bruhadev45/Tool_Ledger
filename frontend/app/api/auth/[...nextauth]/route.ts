@@ -30,9 +30,10 @@ async function refreshAccessToken(token: any) {
         updatedRole = profileResponse.data.role;
         updatedOrganizationId = profileResponse.data.organizationId;
       }
-    } catch (profileError) {
+    } catch (profileError: any) {
       // If profile fetch fails, continue with existing role data
-      console.warn('Failed to refresh user profile:', profileError);
+      // This is not critical - we can use the role from the token
+      // Silently continue - profile refresh is optional, token refresh succeeded
     }
 
     return {
@@ -53,6 +54,8 @@ async function refreshAccessToken(token: any) {
 }
 
 const authOptions: NextAuthOptions = {
+  secret: process.env.NEXTAUTH_SECRET || process.env.NEXTAUTH_URL || 'development-secret-change-in-production',
+  debug: process.env.NODE_ENV === 'development',
   providers: [
     CredentialsProvider({
       name: 'Credentials',
@@ -225,6 +228,10 @@ const authOptions: NextAuthOptions = {
   },
   session: {
     strategy: 'jwt',
+    maxAge: 30 * 24 * 60 * 60, // 30 days
+  },
+  jwt: {
+    maxAge: 30 * 24 * 60 * 60, // 30 days
   },
 };
 

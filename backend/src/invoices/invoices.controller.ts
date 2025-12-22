@@ -10,6 +10,7 @@ import {
   UseGuards,
   UseInterceptors,
   UploadedFile,
+  HttpCode,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { InvoicesService } from './invoices.service';
@@ -88,6 +89,7 @@ export class InvoicesController {
   }
 
   @Post(':id/approve')
+  @HttpCode(200)
   @Roles(UserRole.ADMIN)
   approve(
     @Param('id') id: string,
@@ -98,6 +100,7 @@ export class InvoicesController {
   }
 
   @Post(':id/reject')
+  @HttpCode(200)
   @Roles(UserRole.ADMIN)
   reject(@Param('id') id: string, @CurrentUser() user: any, @Body() body: { reason: string }) {
     return this.invoicesService.reject(id, user.id, user.organizationId, body.reason);

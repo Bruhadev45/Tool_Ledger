@@ -94,7 +94,11 @@ export class UsersController {
 
   @Post(':id/assign/:adminId')
   @Roles(UserRole.ADMIN)
-  assignUserToAdmin(@Param('id') userId: string, @Param('adminId') adminId: string, @CurrentUser() user: any) {
+  assignUserToAdmin(
+    @Param('id') userId: string,
+    @Param('adminId') adminId: string,
+    @CurrentUser() user: any,
+  ) {
     return this.usersService.assignUserToAdmin(userId, adminId, user.organizationId, user.role);
   }
 
