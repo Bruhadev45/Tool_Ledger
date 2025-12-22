@@ -160,22 +160,72 @@ jobs:
 
       - name: Build Backend
         working-directory: backend
-        run: npm run build
+        run: |
+          echo "Building backend..."
+          echo "Current directory: $(pwd)"
+          echo "Node version: $(node --version)"
+          echo "NPM version: $(npm --version)"
+          
+          # Run build and capture exit code
+          npm run build
+          BUILD_EXIT_CODE=$?
+          
+          if [ $BUILD_EXIT_CODE -ne 0 ]; then
+            echo "❌ Build failed with exit code $BUILD_EXIT_CODE"
+            exit $BUILD_EXIT_CODE
+          fi
+          
+          echo "Build complete. Checking dist directory:"
+          if [ ! -d "dist" ]; then
+            echo "❌ ERROR: dist directory not found!"
+            echo "Current directory contents:"
+            ls -la
+            exit 1
+          fi
+          
+          if [ ! -f "dist/main.js" ]; then
+            echo "❌ ERROR: dist/main.js not found!"
+            echo "dist directory contents:"
+            ls -la dist/
+            exit 1
+          fi
+          
+          echo "✅ Build successful: dist/main.js exists"
+          ls -lh dist/main.js
         env:
           DATABASE_URL: postgresql://test:test@localhost:5432/test
           JWT_SECRET: test-secret-key-for-ci-build-only-min-32-chars
           JWT_REFRESH_SECRET: test-refresh-secret-key-for-ci-build-only-min-32-chars
           ENCRYPTION_KEY: v8N3Zp9W4rK2mL6bQx5Yt7G1vS0uJ9n4
 
+      - name: Verify Build Output
+        working-directory: backend
+        run: |
+          echo "Verifying build output exists..."
+          if [ ! -f "dist/main.js" ]; then
+            echo "❌ ERROR: dist/main.js not found!"
+            echo "Current directory contents:"
+            ls -la
+            echo "dist directory contents (if exists):"
+            ls -la dist/ 2>/dev/null || echo "dist directory does not exist"
+            exit 1
+          fi
+          echo "✅ Build output verified: dist/main.js exists"
+          ls -lh dist/main.js
+
       - name: Start Backend Server
         working-directory: backend
         run: |
           # Start backend in background and capture PID
+          echo "Starting backend server..."
           nohup npm run start:prod > ../backend.log 2>&1 &
           echo $! > ../backend.pid
           echo "Backend started in background (PID: $(cat ../backend.pid))"
           echo "Backend process info:"
+          sleep 1
           ps -p $(cat ../backend.pid) || echo "Process not found immediately"
+          echo "Backend log (first 20 lines):"
+          head -20 ../backend.log || echo "No log file yet"
         env:
           DATABASE_URL: postgresql://test:test@localhost:5432/test
           JWT_SECRET: test-secret-key-for-ci-build-only-min-32-chars
