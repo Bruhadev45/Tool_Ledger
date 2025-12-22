@@ -287,47 +287,83 @@ export class AuthService {
    * @throws UnauthorizedException if refresh token is invalid or expired
    */
   async refreshAccessToken(refreshToken: string) {
+    if (!refreshToken) {
+      this.logger.warn('Refresh token validation failed: No token provided');
+      throw new UnauthorizedException('Refresh token is required');
+    }
+
     try {
       // Verify refresh token signature and expiration
-      const payload = this.jwtService.verify(refreshToken, {
-        secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
-      });
+      const refreshSecret = this.configService.get<string>('JWT_REFRESH_SECRET');
+      if (!refreshSecret) {
+        this.logger.error('JWT_REFRESH_SECRET is not configured');
+        throw new UnauthorizedException('Server configuration error');
+      }
+
+      let payload: any;
+      try {
+        payload = this.jwtService.verify(refreshToken, {
+          secret: refreshSecret,
+        });
+      } catch (jwtError: any) {
+        this.logger.warn('Refresh token JWT verification failed', {
+          error: jwtError.message,
+          name: jwtError.name,
+        });
+        throw new UnauthorizedException('Invalid or expired refresh token');
+      }
 
       // Ensure token is actually a refresh token (not access token)
       if (payload.type !== 'refresh') {
         this.logger.warn('Refresh token validation failed: Invalid token type', {
           userId: payload.sub,
+          tokenType: payload.type,
         });
         throw new UnauthorizedException('Invalid token type');
       }
 
       // Verify token exists in database and hasn't been revoked
-      const tokenRecord = await this.prisma.refreshToken.findUnique({
-        where: { token: refreshToken },
-        include: { user: true },
-      });
+      let tokenRecord;
+      try {
+        tokenRecord = await this.prisma.refreshToken.findUnique({
+          where: { token: refreshToken },
+          include: { user: true },
+        });
+      } catch (dbError: any) {
+        this.logger.error('Database error while looking up refresh token', {
+          error: dbError.message,
+          userId: payload.sub,
+        });
+        throw new UnauthorizedException('Database error during token validation');
+      }
 
       // Check if token exists
       if (!tokenRecord) {
         this.logger.warn('Refresh token validation failed: Token not found in database', {
           userId: payload.sub,
+          tokenPrefix: refreshToken.substring(0, 20) + '...',
         });
         throw new UnauthorizedException('Invalid refresh token');
       }
 
       // Check if token hasn't expired
-      if (tokenRecord.expiresAt < new Date()) {
+      const now = new Date();
+      if (tokenRecord.expiresAt < now) {
         this.logger.warn('Refresh token validation failed: Token expired', {
           userId: payload.sub,
           expiresAt: tokenRecord.expiresAt,
-          now: new Date(),
+          now: now,
+          expiredBy: now.getTime() - tokenRecord.expiresAt.getTime(),
         });
-        throw new UnauthorizedException('Token expired');
+        throw new UnauthorizedException('Refresh token expired');
       }
 
       // Check if user is still active
       if (!tokenRecord.user.isActive) {
-        this.logger.warn('Refresh token validation failed: User inactive', { userId: payload.sub });
+        this.logger.warn('Refresh token validation failed: User inactive', {
+          userId: payload.sub,
+          email: tokenRecord.user.email,
+        });
         throw new UnauthorizedException('User account is inactive');
       }
 
@@ -340,18 +376,25 @@ export class AuthService {
         organizationId: user.organizationId,
       };
 
+      this.logger.debug('Refresh token validated successfully', {
+        userId: user.id,
+        email: user.email,
+      });
+
       return {
         access_token: this.jwtService.sign(newPayload),
       };
     } catch (error) {
-      // Log the actual error for debugging
+      // Re-throw UnauthorizedException as-is (already logged)
       if (error instanceof UnauthorizedException) {
         throw error;
       }
-      this.logger.error(
-        'Refresh token validation error',
-        error instanceof Error ? error.stack : String(error),
-      );
+
+      // Log unexpected errors
+      this.logger.error('Unexpected error during refresh token validation', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
       throw new UnauthorizedException('Invalid refresh token');
     }
   }

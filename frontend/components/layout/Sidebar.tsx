@@ -32,10 +32,17 @@ export default function Sidebar({ isMobileOpen = false, onMobileClose }: Sidebar
   const menuItems = [
     { icon: LayoutDashboard, label: 'Dashboard', href: '/dashboard' },
     { icon: Sparkles, label: 'AI Assistant', href: '/ai-assistant' },
-    { icon: Key, label: 'Credentials', href: '/credentials' },
+  ];
+
+  // Credentials - not available for accountants
+  if (role !== 'ACCOUNTANT') {
+    menuItems.push({ icon: Key, label: 'Credentials', href: '/credentials' });
+  }
+
+  menuItems.push(
     { icon: FileText, label: 'Invoices', href: '/invoices' },
     { icon: BarChart3, label: 'Analytics', href: '/analytics' },
-  ];
+  );
 
   if (role === 'ADMIN' || role === 'ACCOUNTANT') {
     menuItems.push({ icon: Users, label: 'Users', href: '/users' });

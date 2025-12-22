@@ -136,8 +136,13 @@ export class UsersService {
     }
 
     // Create new user account
-    // Admins and Accountants are auto-approved, regular users need approval
-    const autoApprove = data.role === UserRole.ADMIN || data.role === UserRole.ACCOUNTANT;
+    // Auto-approve if:
+    // 1. User is ADMIN or ACCOUNTANT role
+    // 2. User is created by an ADMIN (regardless of role)
+    const autoApprove =
+      data.role === UserRole.ADMIN ||
+      data.role === UserRole.ACCOUNTANT ||
+      requesterRole === UserRole.ADMIN;
 
     const user = await this.prisma.user.create({
       data: {
