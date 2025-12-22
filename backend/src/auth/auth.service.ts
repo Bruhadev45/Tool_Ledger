@@ -289,6 +289,7 @@ export class AuthService {
 
       // Ensure token is actually a refresh token (not access token)
       if (payload.type !== 'refresh') {
+        this.logger.warn('Refresh token validation failed: Invalid token type', { userId: payload.sub });
         throw new UnauthorizedException('Invalid token type');
       }
 
@@ -298,9 +299,26 @@ export class AuthService {
         include: { user: true },
       });
 
-      // Check if token exists and hasn't expired
-      if (!tokenRecord || tokenRecord.expiresAt < new Date()) {
+      // Check if token exists
+      if (!tokenRecord) {
+        this.logger.warn('Refresh token validation failed: Token not found in database', { userId: payload.sub });
+        throw new UnauthorizedException('Invalid refresh token');
+      }
+
+      // Check if token hasn't expired
+      if (tokenRecord.expiresAt < new Date()) {
+        this.logger.warn('Refresh token validation failed: Token expired', { 
+          userId: payload.sub,
+          expiresAt: tokenRecord.expiresAt,
+          now: new Date()
+        });
         throw new UnauthorizedException('Token expired');
+      }
+
+      // Check if user is still active
+      if (!tokenRecord.user.isActive) {
+        this.logger.warn('Refresh token validation failed: User inactive', { userId: payload.sub });
+        throw new UnauthorizedException('User account is inactive');
       }
 
       // Generate new access token with current user data
@@ -316,6 +334,11 @@ export class AuthService {
         access_token: this.jwtService.sign(newPayload),
       };
     } catch (error) {
+      // Log the actual error for debugging
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
+      this.logger.error('Refresh token validation error', error instanceof Error ? error.stack : String(error));
       throw new UnauthorizedException('Invalid refresh token');
     }
   }

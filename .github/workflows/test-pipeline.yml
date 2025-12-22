@@ -183,15 +183,29 @@ jobs:
             exit 1
           fi
           
-          if [ ! -f "dist/main.js" ]; then
-            echo "❌ ERROR: dist/main.js not found!"
-            echo "dist directory contents:"
+          # Check for main.js in common locations (check dist/src/main.js first since that's where NestJS outputs)
+          MAIN_JS_PATH=""
+          if [ -f "dist/src/main.js" ]; then
+            MAIN_JS_PATH="dist/src/main.js"
+            echo "✅ Found main.js at: dist/src/main.js"
+          elif [ -f "dist/main.js" ]; then
+            MAIN_JS_PATH="dist/main.js"
+            echo "✅ Found main.js at: dist/main.js"
+          else
+            echo "❌ ERROR: main.js not found in expected locations!"
+            echo "dist directory structure:"
             ls -la dist/
+            echo ""
+            echo "dist/src directory (if exists):"
+            ls -la dist/src/ 2>/dev/null || echo "dist/src does not exist"
+            echo ""
+            echo "Searching for main.js in dist:"
+            find dist -name "main.js" -type f 2>/dev/null || echo "No main.js found"
             exit 1
           fi
           
-          echo "✅ Build successful: dist/main.js exists"
-          ls -lh dist/main.js
+          echo "✅ Build successful: $MAIN_JS_PATH exists"
+          ls -lh "$MAIN_JS_PATH"
         env:
           DATABASE_URL: postgresql://test:test@localhost:5432/test
           JWT_SECRET: test-secret-key-for-ci-build-only-min-32-chars
@@ -202,16 +216,38 @@ jobs:
         working-directory: backend
         run: |
           echo "Verifying build output exists..."
-          if [ ! -f "dist/main.js" ]; then
-            echo "❌ ERROR: dist/main.js not found!"
+          # Check both possible locations (dist/main.js or dist/src/main.js)
+          MAIN_JS_PATH=""
+          if [ -f "dist/src/main.js" ]; then
+            MAIN_JS_PATH="dist/src/main.js"
+            echo "✅ Build output found at: dist/src/main.js"
+          elif [ -f "dist/main.js" ]; then
+            MAIN_JS_PATH="dist/main.js"
+            echo "✅ Build output found at: dist/main.js"
+          else
+            echo "❌ ERROR: main.js not found in expected locations!"
             echo "Current directory contents:"
             ls -la
             echo "dist directory contents (if exists):"
             ls -la dist/ 2>/dev/null || echo "dist directory does not exist"
+            if [ -d "dist" ]; then
+              echo "Searching for main.js in dist:"
+              find dist -name "main.js" -type f 2>/dev/null || echo "No main.js found in dist"
+            fi
             exit 1
           fi
-          echo "✅ Build output verified: dist/main.js exists"
-          ls -lh dist/main.js
+          
+          echo "Verifying file: $MAIN_JS_PATH"
+          ls -lh "$MAIN_JS_PATH"
+          
+          # Ensure package.json uses the correct path (already updated by user, but verify)
+          if [ "$MAIN_JS_PATH" = "dist/src/main.js" ]; then
+            if ! grep -q "dist/src/main.js" package.json; then
+              echo "⚠️  Updating package.json to use dist/src/main.js..."
+              sed -i 's|"start": "node dist/main.js"|"start": "node dist/src/main.js"|g' package.json
+              sed -i 's|"start:prod": "node dist/main.js"|"start:prod": "node dist/src/main.js"|g' package.json
+            fi
+          fi
 
       - name: Start Backend Server
         working-directory: backend
