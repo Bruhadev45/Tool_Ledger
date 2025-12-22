@@ -5,6 +5,7 @@ import { RolesGuard } from '../shared/guards/roles.guard';
 import { Roles } from '../shared/decorators/roles.decorator';
 import { CurrentUser } from '../shared/decorators/current-user.decorator';
 import { UserRole, AuditAction } from '@prisma/client';
+import { UserPayload } from '../shared/types/common.types';
 
 @Controller('audit-logs')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -14,7 +15,7 @@ export class AuditLogController {
   @Get()
   @Roles(UserRole.ADMIN)
   findAll(
-    @CurrentUser() user: any,
+    @CurrentUser() user: UserPayload,
     @Query('resourceType') resourceType?: string,
     @Query('action') action?: AuditAction,
     @Query('userId') userId?: string,

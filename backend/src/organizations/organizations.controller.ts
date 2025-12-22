@@ -18,6 +18,7 @@ import { CurrentUser } from '../shared/decorators/current-user.decorator';
 import { UserRole } from '@prisma/client';
 import { CreateOrganizationDto } from './dto/create-organization.dto';
 import { UpdateOrganizationDto } from './dto/update-organization.dto';
+import { UserPayload } from '../shared/types/common.types';
 
 @Controller('organizations')
 @UseGuards(JwtAuthGuard)
@@ -25,14 +26,14 @@ export class OrganizationsController {
   constructor(private organizationsService: OrganizationsService) {}
 
   @Get('me')
-  getMyOrganization(@CurrentUser() user: any) {
+  getMyOrganization(@CurrentUser() user: UserPayload) {
     return this.organizationsService.findOne(user.organizationId);
   }
 
   @Get()
   @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN)
-  findAll(@CurrentUser() user: any) {
+  findAll(@CurrentUser() user: UserPayload) {
     // For now, return all organizations (admin only)
     // In production, you might want to add pagination and filtering
     return this.organizationsService.findAll();

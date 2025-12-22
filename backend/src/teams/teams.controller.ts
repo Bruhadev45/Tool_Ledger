@@ -5,6 +5,7 @@ import { RolesGuard } from '../shared/guards/roles.guard';
 import { Roles } from '../shared/decorators/roles.decorator';
 import { CurrentUser } from '../shared/decorators/current-user.decorator';
 import { UserRole } from '@prisma/client';
+import { UserPayload } from '../shared/types/common.types';
 
 @Controller('teams')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -12,18 +13,18 @@ export class TeamsController {
   constructor(private teamsService: TeamsService) {}
 
   @Get()
-  findAll(@CurrentUser() user: any) {
+  findAll(@CurrentUser() user: UserPayload) {
     return this.teamsService.findAll(user.organizationId, user.role);
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string, @CurrentUser() user: any) {
+  findOne(@Param('id') id: string, @CurrentUser() user: UserPayload) {
     return this.teamsService.findOne(id, user.organizationId);
   }
 
   @Post()
   @Roles(UserRole.ADMIN, UserRole.ACCOUNTANT)
-  create(@CurrentUser() user: any, @Body() body: { name: string; description?: string }) {
+  create(@CurrentUser() user: UserPayload, @Body() body: { name: string; description?: string }) {
     return this.teamsService.create(user.organizationId, body.name, body.description, user.role);
   }
 
@@ -31,7 +32,7 @@ export class TeamsController {
   @Roles(UserRole.ADMIN, UserRole.ACCOUNTANT)
   update(
     @Param('id') id: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: UserPayload,
     @Body() body: { name?: string; description?: string },
   ) {
     return this.teamsService.update(
@@ -45,13 +46,17 @@ export class TeamsController {
 
   @Delete(':id')
   @Roles(UserRole.ADMIN, UserRole.ACCOUNTANT)
-  remove(@Param('id') id: string, @CurrentUser() user: any) {
+  remove(@Param('id') id: string, @CurrentUser() user: UserPayload) {
     return this.teamsService.remove(id, user.organizationId, user.role);
   }
 
   @Post(':id/users/:userId')
   @Roles(UserRole.ADMIN, UserRole.ACCOUNTANT)
-  addUser(@Param('id') teamId: string, @Param('userId') userId: string, @CurrentUser() user: any) {
+  addUser(
+    @Param('id') teamId: string,
+    @Param('userId') userId: string,
+    @CurrentUser() user: UserPayload,
+  ) {
     return this.teamsService.addUser(teamId, userId, user.organizationId, user.role);
   }
 
@@ -60,7 +65,7 @@ export class TeamsController {
   removeUser(
     @Param('id') teamId: string,
     @Param('userId') userId: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: UserPayload,
   ) {
     return this.teamsService.removeUser(teamId, userId, user.organizationId, user.role);
   }

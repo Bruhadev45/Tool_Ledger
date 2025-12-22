@@ -3,6 +3,7 @@ import { JwtAuthGuard } from '../shared/guards/jwt-auth.guard';
 import { RolesGuard } from '../shared/guards/roles.guard';
 import { CurrentUser } from '../shared/decorators/current-user.decorator';
 import { AiAssistantService } from './ai-assistant.service';
+import { UserPayload } from '../shared/types/common.types';
 
 @Controller('ai-assistant')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -10,12 +11,12 @@ export class AiAssistantController {
   constructor(private aiAssistantService: AiAssistantService) {}
 
   @Get('insights')
-  async getInsights(@CurrentUser() user: any) {
+  async getInsights(@CurrentUser() user: UserPayload) {
     return this.aiAssistantService.getInsights(user.id, user.organizationId, user.role);
   }
 
   @Post('ask')
-  async askQuestion(@CurrentUser() user: any, @Body() body: { question: string }) {
+  async askQuestion(@CurrentUser() user: UserPayload, @Body() body: { question: string }) {
     if (!body.question || !body.question.trim()) {
       return { error: 'Question is required' };
     }

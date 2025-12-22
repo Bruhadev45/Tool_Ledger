@@ -26,6 +26,7 @@ import { AuthService } from './auth.service';
 import { Public } from '../shared/decorators/public.decorator';
 import { CurrentUser } from '../shared/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../shared/guards/jwt-auth.guard';
+import { AuthenticatedUser } from '../shared/types/common.types';
 import {
   RegisterDto,
   LoginDto,
@@ -77,7 +78,7 @@ export class AuthController {
   @UseGuards(AuthGuard('local'))
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  async login(@Request() req: { user: any }, @Body() loginDto: LoginDto) {
+  async login(@Request() req: { user: AuthenticatedUser }, @Body() loginDto: LoginDto) {
     // Check if user has MFA enabled - requires additional verification step
     if (req.user.mfaEnabled) {
       return {

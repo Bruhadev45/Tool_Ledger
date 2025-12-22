@@ -15,6 +15,7 @@ import { RolesGuard } from '../shared/guards/roles.guard';
 import { Roles } from '../shared/decorators/roles.decorator';
 import { CurrentUser } from '../shared/decorators/current-user.decorator';
 import { UserRole } from '@prisma/client';
+import { UserPayload, UserCreationData } from '../shared/types/common.types';
 
 @Controller('users')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -23,40 +24,33 @@ export class UsersController {
 
   @Get()
   @Roles(UserRole.ADMIN, UserRole.ACCOUNTANT)
-  findAll(@CurrentUser() user: any) {
+  findAll(@CurrentUser() user: UserPayload) {
     return this.usersService.findAll(user.organizationId, user.role);
   }
 
   @Get('members')
-  getMembers(@CurrentUser() user: any) {
+  getMembers(@CurrentUser() user: UserPayload) {
     return this.usersService.findOrganizationMembers(user.organizationId);
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string, @CurrentUser() user: any) {
+  findOne(@Param('id') id: string, @CurrentUser() user: UserPayload) {
     return this.usersService.findOne(id, user.organizationId);
   }
 
   @Post()
   @Roles(UserRole.ADMIN, UserRole.ACCOUNTANT)
-  create(
-    @CurrentUser() user: any,
-    @Body()
-    body: {
-      email: string;
-      password: string;
-      firstName: string;
-      lastName: string;
-      role: UserRole;
-      teamId?: string;
-    },
-  ) {
+  create(@CurrentUser() user: UserPayload, @Body() body: UserCreationData) {
     return this.usersService.create(user.organizationId, body, user.role);
   }
 
   @Patch(':id/role')
   @Roles(UserRole.ADMIN, UserRole.ACCOUNTANT)
-  updateRole(@Param('id') id: string, @CurrentUser() user: any, @Body() body: { role: UserRole }) {
+  updateRole(
+    @Param('id') id: string,
+    @CurrentUser() user: UserPayload,
+    @Body() body: { role: UserRole },
+  ) {
     return this.usersService.updateRole(id, user.organizationId, body.role, user.role);
   }
 
@@ -64,7 +58,7 @@ export class UsersController {
   @Roles(UserRole.ADMIN, UserRole.ACCOUNTANT)
   updateStatus(
     @Param('id') id: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: UserPayload,
     @Body() body: { isActive: boolean },
   ) {
     return this.usersService.updateStatus(id, user.organizationId, body.isActive, user.role);
@@ -72,7 +66,7 @@ export class UsersController {
 
   @Delete(':id')
   @Roles(UserRole.ADMIN, UserRole.ACCOUNTANT)
-  remove(@Param('id') id: string, @CurrentUser() user: any) {
+  remove(@Param('id') id: string, @CurrentUser() user: UserPayload) {
     // Prevent users from deleting themselves
     if (id === user.id) {
       throw new BadRequestException('You cannot delete your own account');
@@ -82,13 +76,17 @@ export class UsersController {
 
   @Post(':id/approve')
   @Roles(UserRole.ADMIN)
-  approveUser(@Param('id') id: string, @CurrentUser() user: any) {
+  approveUser(@Param('id') id: string, @CurrentUser() user: UserPayload) {
     return this.usersService.approveUser(id, user.organizationId, user.role);
   }
 
   @Post(':id/reject')
   @Roles(UserRole.ADMIN)
-  rejectUser(@Param('id') id: string, @CurrentUser() user: any, @Body() body: { reason?: string }) {
+  rejectUser(
+    @Param('id') id: string,
+    @CurrentUser() user: UserPayload,
+    @Body() body: { reason?: string },
+  ) {
     return this.usersService.rejectUser(id, user.organizationId, user.role, body.reason);
   }
 
@@ -97,14 +95,14 @@ export class UsersController {
   assignUserToAdmin(
     @Param('id') userId: string,
     @Param('adminId') adminId: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: UserPayload,
   ) {
     return this.usersService.assignUserToAdmin(userId, adminId, user.organizationId, user.role);
   }
 
   @Post(':id/unassign')
   @Roles(UserRole.ADMIN)
-  unassignUserFromAdmin(@Param('id') id: string, @CurrentUser() user: any) {
+  unassignUserFromAdmin(@Param('id') id: string, @CurrentUser() user: UserPayload) {
     return this.usersService.unassignUserFromAdmin(id, user.organizationId, user.role);
   }
 }

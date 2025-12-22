@@ -13,9 +13,27 @@ import { UserRole, UserApprovalStatus } from '@prisma/client';
 export interface UserPayload {
   id: string;
   email: string;
+  firstName: string;
+  lastName: string;
   role: UserRole;
   organizationId: string;
   mfaEnabled?: boolean;
+  requiresMfaSetup?: boolean;
+}
+
+/**
+ * Authenticated user object (from LocalStrategy)
+ * Contains full user data after authentication
+ */
+export interface AuthenticatedUser {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  role: UserRole;
+  organizationId: string;
+  mfaEnabled: boolean;
+  requiresMfaSetup?: boolean;
 }
 
 /**

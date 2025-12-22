@@ -21,6 +21,7 @@ import { Roles } from '../shared/decorators/roles.decorator';
 import { CurrentUser } from '../shared/decorators/current-user.decorator';
 import { UserRole, InvoiceStatus } from '@prisma/client';
 import { CreateInvoiceDto, UpdateInvoiceDto, ApproveInvoiceDto } from './dto';
+import { UserPayload } from '../shared/types/common.types';
 
 @Controller('invoices')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -33,7 +34,7 @@ export class InvoicesController {
   @Post()
   @UseInterceptors(FileInterceptor('file'))
   async create(
-    @CurrentUser() user: any,
+    @CurrentUser() user: UserPayload,
     @Body() createDto: CreateInvoiceDto,
     @UploadedFile() file?: Express.Multer.File,
   ) {
@@ -42,7 +43,7 @@ export class InvoicesController {
 
   @Get()
   findAll(
-    @CurrentUser() user: any,
+    @CurrentUser() user: UserPayload,
     @Query('status') status?: InvoiceStatus,
     @Query('provider') provider?: string,
     @Query('startDate') startDate?: string,
@@ -65,26 +66,32 @@ export class InvoicesController {
     try {
       const result = await this.invoicesParserService.parseInvoiceFile(file);
       return result;
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to parse invoice';
+      const errorStack = error instanceof Error ? error.stack : undefined;
       return {
-        error: error.message || 'Failed to parse invoice',
-        details: error.stack,
+        error: errorMessage,
+        details: errorStack,
       };
     }
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string, @CurrentUser() user: any) {
+  findOne(@Param('id') id: string, @CurrentUser() user: UserPayload) {
     return this.invoicesService.findOne(id, user.organizationId, user.role);
   }
 
   @Get(':id/download')
-  getSignedUrl(@Param('id') id: string, @CurrentUser() user: any) {
+  getSignedUrl(@Param('id') id: string, @CurrentUser() user: UserPayload) {
     return this.invoicesService.getSignedUrl(id, user.organizationId, user.role);
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @CurrentUser() user: any, @Body() updateDto: UpdateInvoiceDto) {
+  update(
+    @Param('id') id: string,
+    @CurrentUser() user: UserPayload,
+    @Body() updateDto: UpdateInvoiceDto,
+  ) {
     return this.invoicesService.update(id, user.id, user.organizationId, user.role, updateDto);
   }
 
@@ -93,7 +100,7 @@ export class InvoicesController {
   @Roles(UserRole.ADMIN)
   approve(
     @Param('id') id: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: UserPayload,
     @Body() approveDto: ApproveInvoiceDto,
   ) {
     return this.invoicesService.approve(id, user.id, user.organizationId, approveDto);
@@ -102,12 +109,16 @@ export class InvoicesController {
   @Post(':id/reject')
   @HttpCode(200)
   @Roles(UserRole.ADMIN)
-  reject(@Param('id') id: string, @CurrentUser() user: any, @Body() body: { reason: string }) {
+  reject(
+    @Param('id') id: string,
+    @CurrentUser() user: UserPayload,
+    @Body() body: { reason: string },
+  ) {
     return this.invoicesService.reject(id, user.id, user.organizationId, body.reason);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string, @CurrentUser() user: any) {
+  remove(@Param('id') id: string, @CurrentUser() user: UserPayload) {
     return this.invoicesService.remove(id, user.id, user.organizationId, user.role);
   }
 }

@@ -42,7 +42,7 @@ export class StorageController {
       res.setHeader('Content-Type', contentType);
       res.setHeader('Content-Disposition', `inline; filename="${path.basename(fullPath)}"`);
       res.sendFile(fullPath);
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (error instanceof NotFoundException) {
         throw error;
       }
